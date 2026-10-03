@@ -1,6 +1,6 @@
 {
   "name": "sculpt",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Library for transforming structured data through rules and relationships.",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -16,7 +16,8 @@
   "scripts": {
     "build": "tsup",
     "test": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm test && npm run build"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",
