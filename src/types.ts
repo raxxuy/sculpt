@@ -1,5 +1,7 @@
 export type Transform<T> = (data: T) => T;
 
+export type Derive<T, R> = (data: T) => R;
+
 export type TransformOptions = {
   after?: string[];
 };
@@ -10,14 +12,16 @@ export type RegisteredTransform<T> = {
   after: string[];
 };
 
-export type Sculpt<T> = {
-  transform(transform: Transform<T>, options?: TransformOptions): Sculpt<T>;
+export type Sculpt<Initial, Current = Initial> = {
+  transform(transform: Transform<Current>): Sculpt<Initial, Current>;
 
   transform(
     name: string,
-    transform: Transform<T>,
+    transform: Transform<Current>,
     options?: TransformOptions,
-  ): Sculpt<T>;
+  ): Sculpt<Initial, Current>;
 
-  run(): T;
+  derive<R>(derive: Derive<Current, R>): Sculpt<Initial, R>;
+
+  run(): Current;
 };

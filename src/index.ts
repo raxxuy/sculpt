@@ -1,2 +1,2 @@
 export { sculpt } from "./sculpt";
-export type { Transform } from "./types";
+export type { Derive, Transform } from "./types";
