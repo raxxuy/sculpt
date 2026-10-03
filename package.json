@@ -1,0 +1,29 @@
+{
+  "name": "sculpt",
+  "version": "0.1.0",
+  "description": "Library for transforming structured data through rules and relationships.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.15",
+    "@types/bun": "latest",
+    "tsup": "^8.5.1",
+    "typescript": "5.9",
+    "vitest": "^5.0.3"
+  },
+  "private": true
+}
