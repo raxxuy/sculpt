@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sculpt } from "../src/sculpt";
+import { sculpt } from "../src/core/sculpt";
 
 describe("sculpt", () => {
   it("applies transformations", () => {
@@ -65,7 +65,7 @@ describe("sculpt", () => {
           },
         )
         .run(),
-    ).toThrow();
+    ).toThrow('Transform "double" depends on unknown transform "missing"');
   });
 
   it("throws on circular dependencies", () => {
@@ -78,7 +78,7 @@ describe("sculpt", () => {
           after: ["first"],
         })
         .run(),
-    ).toThrow();
+    ).toThrow("Circular dependency among transforms: first, second");
   });
 
   it("preserves registration order for independent transforms", () => {

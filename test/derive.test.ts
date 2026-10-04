@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sculpt } from "../src/sculpt";
+import { sculpt } from "../src/core/sculpt";
 
 describe("derive", () => {
   it("derives a new shape", () => {

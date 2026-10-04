@@ -25,3 +25,10 @@ export type Sculpt<Initial, Current = Initial> = {
 
   run(): Current;
 };
+
+export type Context = {
+  transforms: RegisteredTransform<any>[];
+  derive?: Derive<any, any>;
+};
+
+export type Pipeline = { data: unknown; contexts: Context[] };
