@@ -1,6 +1,6 @@
 {
   "name": "sculpt",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Library for transforming structured data through rules and relationships.",
   "type": "module",
   "main": "./dist/index.cjs",
