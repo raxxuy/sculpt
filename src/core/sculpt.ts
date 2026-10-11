@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/suspicious/noExplicitAny: <> */
 import { collect, type Node } from "./pipeline";
 import { resolveTransforms } from "./resolve";
 import type {
