@@ -495,9 +495,11 @@ describe("sculpt - intensive integration", () => {
   it("does not share transform registration between snapshots", () => {
     const base = sculpt({ value: 1 }).snapshot();
 
-    const first = base.transform("first", (data) => ({
-      value: data.value + 1,
-    })).snapshot();
+    const first = base
+      .transform("first", (data) => ({
+        value: data.value + 1,
+      }))
+      .snapshot();
 
     const second = base.transform("second", (data) => ({
       value: data.value + 10,
@@ -742,9 +744,11 @@ describe("sculpt - intensive integration", () => {
     const base = sculpt({
       firstName: "Test",
       lastName: "Name",
-    }).derive((data) => ({
-      fullName: `${data.firstName} ${data.lastName}`,
-    })).snapshot();
+    })
+      .derive((data) => ({
+        fullName: `${data.firstName} ${data.lastName}`,
+      }))
+      .snapshot();
 
     const upper = base
       .transform((data) => ({
