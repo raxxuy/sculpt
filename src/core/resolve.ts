@@ -3,6 +3,22 @@ import type { RegisteredTransform } from "./types";
 export const resolveTransforms = <T>(
   transforms: RegisteredTransform<T>[],
 ): RegisteredTransform<T>[] => {
+  const done = new Set<string>();
+
+  for (const { name, after } of transforms) {
+    if (!after.every((dependency) => done.has(dependency))) {
+      return reorder(transforms);
+    }
+
+    if (name !== undefined) done.add(name);
+  }
+
+  return transforms;
+};
+
+const reorder = <T>(
+  transforms: RegisteredTransform<T>[],
+): RegisteredTransform<T>[] => {
   const resolved: RegisteredTransform<T>[] = [];
   const done = new Set<string>();
   const remaining = [...transforms];
@@ -14,10 +30,11 @@ export const resolveTransforms = <T>(
 
     if (index === -1) throw diagnose(transforms, remaining);
 
-    const next = remaining.splice(index, 1)[0] as RegisteredTransform<T>;
+    const [next] = remaining.splice(index, 1);
+    if (!next) throw new Error("Unable to resolve transform dependencies");
 
     resolved.push(next);
-    if (next.name) done.add(next.name);
+    if (next.name !== undefined) done.add(next.name);
   }
 
   return resolved;
@@ -26,14 +43,14 @@ export const resolveTransforms = <T>(
 const diagnose = <T>(
   all: RegisteredTransform<T>[],
   blocked: RegisteredTransform<T>[],
-) => {
+): Error => {
   const known = new Set(all.map(({ name }) => name));
   const missing = blocked
     .flatMap(({ after }) => after)
     .find((dependency) => !known.has(dependency));
 
   return new Error(
-    missing
+    missing !== undefined
       ? `Unknown transform dependency "${missing}"`
       : "Circular transform dependencies",
   );

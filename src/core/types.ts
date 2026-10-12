@@ -12,16 +12,17 @@ export type RegisteredTransform<T> = {
   after: string[];
 };
 
-export type Sculpt<Initial, Current = Initial> = {
-  transform(transform: Transform<Current>): Sculpt<Initial, Current>;
+// biome-ignore lint/suspicious/noExplicitAny: heterogeneous pipeline steps
+export type Step = (data: any) => any;
 
-  transform(
-    name: string,
-    transform: Transform<Current>,
-    options?: TransformOptions,
-  ): Sculpt<Initial, Current>;
-
-  derive<R>(derive: Derive<Current, R>): Sculpt<Initial, R>;
-
-  run(): Current;
-};
+export type Entry =
+  | {
+      kind: "transform";
+      name?: string;
+      transform: Step;
+      after: string[];
+    }
+  | {
+      kind: "derive";
+      derive: Step;
+    };
