@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { at, sculpt } from "../src";
+import { sculpt } from "../src";
+import { at } from "../src/transforms";
 
 describe("at", () => {
   it("transforms a top-level property", () => {

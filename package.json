@@ -8,16 +8,42 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./transforms": {
+      "import": {
+        "types": "./dist/transforms.d.ts",
+        "default": "./dist/transforms.js"
+      },
+      "require": {
+        "types": "./dist/transforms.d.cts",
+        "default": "./dist/transforms.cjs"
+      }
+    },
+    "./derivations": {
+      "import": {
+        "types": "./dist/derivations.d.ts",
+        "default": "./dist/derivations.js"
+      },
+      "require": {
+        "types": "./dist/derivations.d.cts",
+        "default": "./dist/derivations.cjs"
+      }
     }
   },
   "scripts": {
     "build": "tsup",
     "test": "vitest",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm test && npm run build"
+    "biome": "biome check",
+    "check": "npm run typecheck && npm test && npm run biome && npm run build"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",
