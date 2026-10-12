@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { sculpt } from "../src/core/sculpt";
-import { at } from "../src/transforms/at";
-import { compose } from "../src/transforms/compose";
+import { sculpt } from "../src";
+import { at, compose } from "../src/transforms";
 
 describe("compose", () => {
   it("returns input unchanged when no transforms are provided", () => {

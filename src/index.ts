@@ -4,5 +4,3 @@ export type {
   Transform,
   TransformOptions,
 } from "./core/types";
-export { at } from "./transforms/at";
-export { compose } from "./transforms/compose";
