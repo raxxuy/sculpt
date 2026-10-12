@@ -38,8 +38,12 @@
       }
     }
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
+    "prepare": "npm run build",
     "test": "vitest",
     "typecheck": "tsc --noEmit",
     "biome": "biome check",
