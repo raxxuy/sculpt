@@ -296,7 +296,7 @@ describe("sculpt - intensive integration", () => {
   it("supports multiple independent branches from one base", () => {
     const base = sculpt({
       value: 10,
-    });
+    }).snapshot();
 
     const doubled = base
       .transform((data) => ({
@@ -321,7 +321,7 @@ describe("sculpt - intensive integration", () => {
     const base = sculpt({
       firstName: "Test",
       lastName: "Name",
-    });
+    }).snapshot();
 
     const profile = base
       .derive((data) => ({
@@ -352,9 +352,11 @@ describe("sculpt - intensive integration", () => {
   it("supports branching after transformations", () => {
     const base = sculpt({
       values: [1, 2, 3],
-    }).transform((data) => ({
-      values: data.values.map((value) => value * 2),
-    }));
+    })
+      .transform((data) => ({
+        values: data.values.map((value) => value * 2),
+      }))
+      .snapshot();
 
     const sum = base
       .derive((data) => ({
@@ -438,7 +440,7 @@ describe("sculpt - intensive integration", () => {
     let firstCalls = 0;
     let secondCalls = 0;
 
-    const base = sculpt({ value: 1 });
+    const base = sculpt({ value: 1 }).snapshot();
 
     const first = base.transform((data) => {
       firstCalls++;
@@ -491,11 +493,11 @@ describe("sculpt - intensive integration", () => {
   });
 
   it("does not share transform registration between snapshots", () => {
-    const base = sculpt({ value: 1 });
+    const base = sculpt({ value: 1 }).snapshot();
 
     const first = base.transform("first", (data) => ({
       value: data.value + 1,
-    }));
+    })).snapshot();
 
     const second = base.transform("second", (data) => ({
       value: data.value + 10,
@@ -720,7 +722,7 @@ describe("sculpt - intensive integration", () => {
   it("handles many branches from one snapshot", () => {
     const base = sculpt({
       value: 100,
-    });
+    }).snapshot();
 
     const results = Array.from({ length: 100 }, (_, index) =>
       base
@@ -742,7 +744,7 @@ describe("sculpt - intensive integration", () => {
       lastName: "Name",
     }).derive((data) => ({
       fullName: `${data.firstName} ${data.lastName}`,
-    }));
+    })).snapshot();
 
     const upper = base
       .transform((data) => ({

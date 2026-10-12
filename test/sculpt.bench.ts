@@ -1,5 +1,5 @@
 import { describe, test } from "vitest";
-import { sculpt } from "../dist/index";
+import { sculpt } from "../src";
 
 const sizes = [10, 100, 1_000];
 
