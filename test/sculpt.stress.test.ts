@@ -50,7 +50,7 @@ describe("sculpt - intensive integration", () => {
           minors: data.userCount - data.adultCount,
         },
       }))
-      .transform("addLabel", (data) => ({
+      .derive((data) => ({
         ...data,
         label: `${data.summary.adults}/${data.summary.users} adults`,
       }))

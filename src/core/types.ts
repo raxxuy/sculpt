@@ -6,6 +6,10 @@ export type TransformOptions = {
   after?: string[];
 };
 
+export type CheckedTransform<T, R extends T> = (
+  data: T,
+) => R & Record<Exclude<keyof R, keyof T>, never>;
+
 export type RegisteredTransform<T> = {
   name?: string;
   transform: Transform<T>;

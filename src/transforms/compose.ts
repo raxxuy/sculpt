@@ -1,6 +1,16 @@
-import type { Transform } from "../core/types";
+import type { CheckedTransform, Transform } from "../core/types";
 
-export const compose =
+export type Compose = {
+  <T>(): Transform<T>;
+
+  <T, R extends T[]>(
+    ...transforms: {
+      [K in keyof R]: CheckedTransform<T, R[K]>;
+    }
+  ): Transform<T>;
+};
+
+export const compose: Compose =
   <T>(...transforms: Transform<T>[]): Transform<T> =>
   (data) => {
     let value = data;

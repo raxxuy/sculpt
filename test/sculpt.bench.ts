@@ -146,7 +146,7 @@ describe("realistic workload", () => {
       after: ["filter"],
     })
     .derive(summarize)
-    .transform(total);
+    .derive(total);
 
   test("1,000 rows", async ({ bench }) => {
     await bench.compare(
