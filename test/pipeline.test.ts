@@ -230,3 +230,82 @@ describe("pipeline dependencies", () => {
     );
   });
 });
+
+describe("pipeline edge cases", () => {
+  it("runs newly unblocked transforms before later ready transforms", () => {
+    const order: string[] = [];
+
+    sculpt(0)
+      .transform(
+        "a",
+        (value) => {
+          order.push("a");
+          return value;
+        },
+        { after: ["b"] },
+      )
+      .transform("b", (value) => {
+        order.push("b");
+        return value;
+      })
+      .transform((value) => {
+        order.push("c");
+        return value;
+      })
+      .run();
+
+    expect(order).toEqual(["b", "a", "c"]);
+  });
+
+  it("handles repeated dependency names", () => {
+    const result = sculpt(10)
+      .transform("increment", (value) => value + 5, {
+        after: ["double", "double"],
+      })
+      .transform("double", (value) => value * 2)
+      .run();
+
+    expect(result).toBe(25);
+  });
+
+  it("rejects self-dependencies", () => {
+    const pipeline = sculpt(10).transform("double", (value) => value * 2, {
+      after: ["double"],
+    });
+
+    expect(() => pipeline.run()).toThrow("Circular transform dependencies");
+  });
+
+  it("shares input data across snapshot branches", () => {
+    const data = { value: 10 };
+    const base = sculpt(data).snapshot();
+
+    const branch = base.transform((value) => {
+      value.value += 5;
+      return value;
+    });
+
+    expect(branch.run()).toBe(data);
+    expect(base.run()).toBe(data);
+    expect(data.value).toBe(15);
+  });
+
+  it("validates all dependency scopes before executing callbacks", () => {
+    let calls = 0;
+
+    const pipeline = sculpt(10)
+      .transform((value) => {
+        calls++;
+        return value;
+      })
+      .derive((value) => ({ value }))
+      .transform("increment", (data) => data, {
+        after: ["missing"],
+      });
+
+    expect(() => pipeline.run()).toThrow(
+      'Unknown transform dependency "missing"',
+    );
+    expect(calls).toBe(0);
+  });
+});

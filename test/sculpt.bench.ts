@@ -7,21 +7,23 @@ const increment = (value: number) => value + 1;
 const identity = (value: number) => value;
 
 const createPipeline = (count: number) => {
-  let pipeline = sculpt(0);
+  const pipeline = sculpt(0);
 
   for (let i = 0; i < count; i++) {
-    pipeline = pipeline.transform(increment);
+    pipeline.transform(increment);
   }
 
   return pipeline;
 };
 
-const createDependentPipeline = (count: number) => {
-  let pipeline = sculpt(0);
+const createDependentPipeline = (count: number, reverse = false) => {
+  const pipeline = sculpt(0);
 
   for (let i = 0; i < count; i++) {
-    pipeline = pipeline.transform(`step-${i}`, increment, {
-      after: i === 0 ? [] : [`step-${i - 1}`],
+    const index = reverse ? count - i - 1 : i;
+
+    pipeline.transform(`step-${index}`, increment, {
+      after: index === 0 ? [] : [`step-${index - 1}`],
     });
   }
 
@@ -38,8 +40,16 @@ const createDerivedPipeline = (count: number) => {
   return pipeline;
 };
 
-const createNative = (count: number) =>
-  Array.from({ length: count }, () => increment);
+const createNative = (count: number, derived = false) => {
+  const transforms: ((value: number) => number)[] = [];
+
+  for (let i = 0; i < count; i++) {
+    transforms.push(increment);
+    if (derived) transforms.push(identity);
+  }
+
+  return transforms;
+};
 
 const runNative = (
   initial: number,
@@ -54,12 +64,14 @@ const runNative = (
   return value;
 };
 
-describe("execution", () => {
+describe("cached execution", () => {
   for (const size of sizes) {
-    const pipeline = createPipeline(size);
-    const transforms = createNative(size);
-
     test(`${size} transforms`, async ({ bench }) => {
+      const pipeline = createPipeline(size);
+      const transforms = createNative(size);
+
+      pipeline.run();
+
       await bench.compare(
         bench("sculpt", () => pipeline.run()),
         bench("native", () => runNative(0, transforms)),
@@ -68,7 +80,7 @@ describe("execution", () => {
   }
 });
 
-describe("construction + execution", () => {
+describe("construction + first execution", () => {
   for (const size of sizes) {
     test(`${size} transforms`, async ({ bench }) => {
       await bench.compare(
@@ -79,12 +91,14 @@ describe("construction + execution", () => {
   }
 });
 
-describe("dependencies", () => {
+describe("dependencies: cached execution", () => {
   for (const size of sizes) {
-    const pipeline = createDependentPipeline(size);
-    const transforms = createNative(size);
-
     test(`${size} chained dependencies`, async ({ bench }) => {
+      const pipeline = createDependentPipeline(size);
+      const transforms = createNative(size);
+
+      pipeline.run();
+
       await bench.compare(
         bench("sculpt", () => pipeline.run()),
         bench("native", () => runNative(0, transforms)),
@@ -93,62 +107,80 @@ describe("dependencies", () => {
   }
 });
 
-describe("derive boundaries", () => {
+describe("dependencies: construction + resolution + first execution", () => {
   for (const size of sizes) {
-    const pipeline = createDerivedPipeline(size);
-    const transforms = createNative(size);
+    test(`${size} chained dependencies`, async ({ bench }) => {
+      await bench.compare(
+        bench("ordered", () => createDependentPipeline(size).run()),
+        bench("reversed", () => createDependentPipeline(size, true).run()),
+      );
+    });
+  }
+});
 
+describe("derive boundaries: cached execution", () => {
+  for (const size of sizes) {
     test(`${size} derive boundaries`, async ({ bench }) => {
+      const pipeline = createDerivedPipeline(size);
+      const transforms = createNative(size, true);
+
+      pipeline.run();
+
       await bench.compare(
         bench("sculpt", () => pipeline.run()),
-        bench("native", () => {
-          let value = 0;
+        bench("native", () => runNative(0, transforms)),
+      );
+    });
+  }
+});
 
-          for (const transform of transforms) {
-            value = identity(transform(value));
-          }
-
-          return value;
-        }),
+describe("derive boundaries: construction + first execution", () => {
+  for (const size of sizes) {
+    test(`${size} derive boundaries`, async ({ bench }) => {
+      await bench.compare(
+        bench("sculpt", () => createDerivedPipeline(size).run()),
+        bench("native", () => runNative(0, createNative(size, true))),
       );
     });
   }
 });
 
 describe("realistic workload", () => {
-  const data = Array.from({ length: 1_000 }, (_, i) => ({
-    id: i,
-    value: i,
-    active: i % 2 === 0,
-  }));
-
-  const filter = (rows: typeof data) => rows.filter((row) => row.active);
-
-  const normalize = (rows: typeof data) =>
-    rows.map((row) => ({
-      ...row,
-      value: row.value / 1_000,
+  test("1,000 rows", async ({ bench }) => {
+    const data = Array.from({ length: 1_000 }, (_, i) => ({
+      id: i,
+      value: i,
+      active: i % 2 === 0,
     }));
 
-  const summarize = (rows: typeof data) => ({
-    rows,
-    count: rows.length,
-  });
+    const filter = (rows: typeof data) => rows.filter((row) => row.active);
 
-  const total = (result: ReturnType<typeof summarize>) => ({
-    ...result,
-    total: result.rows.reduce((sum, row) => sum + row.value, 0),
-  });
+    const normalize = (rows: typeof data) =>
+      rows.map((row) => ({
+        ...row,
+        value: row.value / 1_000,
+      }));
 
-  const pipeline = sculpt(data)
-    .transform("filter", filter)
-    .transform("normalize", normalize, {
-      after: ["filter"],
-    })
-    .derive(summarize)
-    .derive(total);
+    const summarize = (rows: typeof data) => ({
+      rows,
+      count: rows.length,
+    });
 
-  test("1,000 rows", async ({ bench }) => {
+    const total = (result: ReturnType<typeof summarize>) => ({
+      ...result,
+      total: result.rows.reduce((sum, row) => sum + row.value, 0),
+    });
+
+    const pipeline = sculpt(data)
+      .transform("filter", filter)
+      .transform("normalize", normalize, {
+        after: ["filter"],
+      })
+      .derive(summarize)
+      .derive(total);
+
+    pipeline.run();
+
     await bench.compare(
       bench("sculpt", () => pipeline.run()),
       bench("native", () => total(summarize(normalize(filter(data))))),
