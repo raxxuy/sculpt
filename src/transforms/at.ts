@@ -1,5 +1,5 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: <> */
-import type { Transform } from "../core/types";
+import type { CheckedTransform, Transform } from "../core/types";
 
 type Path<T> = T extends readonly unknown[]
   ? never
@@ -15,6 +15,15 @@ type PathValue<T, P extends string> = P extends `${infer K}.${infer R}`
     ? T[P]
     : never;
 
+export type At = <
+  T extends object,
+  P extends Path<T>,
+  R extends PathValue<T, P> = PathValue<T, P>,
+>(
+  path: P | readonly P[],
+  transform: CheckedTransform<PathValue<T, P>, R>,
+) => Transform<T>;
+
 const update = (data: any, keys: string[], fn: Transform<any>): any => {
   const [key, ...rest] = keys as [string, ...string[]];
   const value = rest.length ? update(data[key], rest, fn) : fn(data[key]);
@@ -24,7 +33,7 @@ const update = (data: any, keys: string[], fn: Transform<any>): any => {
     : { ...data, [key]: value };
 };
 
-export const at = <T extends object, P extends Path<T>>(
+export const at: At = <T extends object, P extends Path<T>>(
   path: P | readonly P[],
   transform: Transform<PathValue<T, P>>,
 ): Transform<T> => {

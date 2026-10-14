@@ -1,5 +1,12 @@
 import { resolveTransforms } from "./resolve";
-import type { Derive, Entry, Step, Transform, TransformOptions } from "./types";
+import type {
+  CheckedTransform,
+  Derive,
+  Entry,
+  Step,
+  Transform,
+  TransformOptions,
+} from "./types";
 
 const emptyDependencies: string[] = [];
 
@@ -12,11 +19,11 @@ export class Pipeline<T> {
     private readonly forkOnTransform = false,
   ) {}
 
-  transform(transform: Transform<T>): Pipeline<T>;
+  transform<R extends T>(transform: CheckedTransform<T, R>): Pipeline<T>;
 
-  transform(
+  transform<R extends T>(
     name: string,
-    transform: Transform<T>,
+    transform: CheckedTransform<T, R>,
     options?: TransformOptions,
   ): Pipeline<T>;
 
