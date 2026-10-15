@@ -7,22 +7,22 @@ const increment = (value: number) => value + 1;
 const identity = (value: number) => value;
 
 const createPipeline = (count: number) => {
-  const pipeline = sculpt(0);
+  let pipeline = sculpt(0);
 
   for (let i = 0; i < count; i++) {
-    pipeline.transform(increment);
+    pipeline = pipeline.transform(increment);
   }
 
   return pipeline;
 };
 
 const createDependentPipeline = (count: number, reverse = false) => {
-  const pipeline = sculpt(0);
+  let pipeline = sculpt(0);
 
   for (let i = 0; i < count; i++) {
     const index = reverse ? count - i - 1 : i;
 
-    pipeline.transform(`step-${index}`, increment, {
+    pipeline = pipeline.transform(`step-${index}`, increment, {
       after: index === 0 ? [] : [`step-${index - 1}`],
     });
   }
