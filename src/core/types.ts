@@ -30,3 +30,8 @@ export type Entry =
       kind: "derive";
       derive: Step;
     };
+
+export type Node = {
+  entry: Entry;
+  previous?: Node;
+};

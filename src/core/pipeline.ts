@@ -3,6 +3,7 @@ import type {
   CheckedTransform,
   Derive,
   Entry,
+  Node,
   Step,
   Transform,
   TransformOptions,
@@ -19,8 +20,7 @@ export class Pipeline<
 
   constructor(
     private readonly data: Input | undefined,
-    private readonly entries: Entry[] = [],
-    private readonly forkOnTransform = false,
+    private readonly head?: Node,
   ) {}
 
   transform<R extends Output>(
@@ -46,39 +46,31 @@ export class Pipeline<
       throw new Error("Named transform requires transform function");
     }
 
-    const target = this.forkOnTransform ? this.fork() : this;
-
-    target.entries.push({
-      kind: "transform",
-      name: named ? nameOrTransform : undefined,
-      transform: callback,
-      after: named && options?.after ? [...options.after] : emptyDependencies,
+    return new Pipeline<Input, Output, HasDefault>(this.data, {
+      previous: this.head,
+      entry: {
+        kind: "transform",
+        name: named ? nameOrTransform : undefined,
+        transform: callback,
+        after: named && options?.after ? [...options.after] : emptyDependencies,
+      },
     });
-    target.compiled = undefined;
-
-    return target;
-  }
-
-  private fork(forkOnTransform = false): Pipeline<Input, Output, HasDefault> {
-    return new Pipeline<Input, Output, HasDefault>(
-      this.data,
-      [...this.entries],
-      forkOnTransform,
-    );
-  }
-
-  snapshot(): Pipeline<Input, Output, HasDefault> {
-    return this.fork(true);
   }
 
   derive<R>(derive: Derive<Output, R>): Pipeline<Input, R, HasDefault> {
-    return new Pipeline<Input, R, HasDefault>(this.data, [
-      ...this.entries,
-      { kind: "derive", derive },
-    ]);
+    return new Pipeline<Input, R, HasDefault>(this.data, {
+      previous: this.head,
+      entry: { kind: "derive", derive },
+    });
   }
 
   private compile(): Step[] {
+    const entries: Entry[] = [];
+
+    for (let node = this.head; node; node = node.previous) {
+      entries.push(node.entry);
+    }
+
     const steps: Step[] = [];
     const transforms: Extract<Entry, { kind: "transform" }>[] = [];
 
@@ -90,7 +82,9 @@ export class Pipeline<
       transforms.length = 0;
     };
 
-    for (const entry of this.entries) {
+    for (let index = entries.length - 1; index >= 0; index--) {
+      const entry = entries[index] as Entry;
+
       if (entry.kind === "transform") transforms.push(entry);
       else {
         flush();
