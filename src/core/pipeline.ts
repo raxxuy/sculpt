@@ -10,65 +10,69 @@ import type {
 
 const emptyDependencies: string[] = [];
 
-export class Pipeline<T> {
+export class Pipeline<
+  Input,
+  Output = Input,
+  HasDefault extends boolean = true,
+> {
   private compiled?: Step[];
 
   constructor(
-    private readonly data: unknown,
+    private readonly data: Input | undefined,
     private readonly entries: Entry[] = [],
     private readonly forkOnTransform = false,
   ) {}
 
-  transform<R extends T>(transform: CheckedTransform<T, R>): Pipeline<T>;
+  transform<R extends Output>(
+    transform: CheckedTransform<Output, R>,
+  ): Pipeline<Input, Output, HasDefault>;
 
-  transform<R extends T>(
+  transform<R extends Output>(
     name: string,
-    transform: CheckedTransform<T, R>,
+    transform: CheckedTransform<Output, R>,
     options?: TransformOptions,
-  ): Pipeline<T>;
+  ): Pipeline<Input, Output, HasDefault>;
 
   transform(
-    nameOrTransform: string | Transform<T>,
-    transform?: Transform<T>,
+    nameOrTransform: string | Transform<Output>,
+    transform?: Transform<Output>,
     options?: TransformOptions,
-  ): Pipeline<T> {
-    let entry: Extract<Entry, { kind: "transform" }>;
+  ): Pipeline<Input, Output, HasDefault> {
+    const named = typeof nameOrTransform === "string";
+    const callback =
+      typeof nameOrTransform === "function" ? nameOrTransform : transform;
 
-    if (typeof nameOrTransform === "string") {
-      if (typeof transform !== "function") {
-        throw new Error("Named transform requires transform function");
-      }
-
-      entry = {
-        kind: "transform",
-        name: nameOrTransform,
-        transform,
-        after: options?.after ? [...options.after] : emptyDependencies,
-      };
-    } else {
-      entry = {
-        kind: "transform",
-        transform: nameOrTransform,
-        after: emptyDependencies,
-      };
+    if (typeof callback !== "function") {
+      throw new Error("Named transform requires transform function");
     }
 
-    const target = this.forkOnTransform
-      ? new Pipeline<T>(this.data, [...this.entries])
-      : this;
+    const target = this.forkOnTransform ? this.fork() : this;
 
-    target.entries.push(entry);
+    target.entries.push({
+      kind: "transform",
+      name: named ? nameOrTransform : undefined,
+      transform: callback,
+      after: named && options?.after ? [...options.after] : emptyDependencies,
+    });
     target.compiled = undefined;
 
     return target;
   }
 
-  snapshot(): Pipeline<T> {
-    return new Pipeline<T>(this.data, [...this.entries], true);
+  private fork(forkOnTransform = false): Pipeline<Input, Output, HasDefault> {
+    return new Pipeline<Input, Output, HasDefault>(
+      this.data,
+      [...this.entries],
+      forkOnTransform,
+    );
   }
 
-  derive<R>(derive: Derive<T, R>): Pipeline<R> {
-    return new Pipeline<R>(this.data, [
+  snapshot(): Pipeline<Input, Output, HasDefault> {
+    return this.fork(true);
+  }
+
+  derive<R>(derive: Derive<Output, R>): Pipeline<Input, R, HasDefault> {
+    return new Pipeline<Input, R, HasDefault>(this.data, [
       ...this.entries,
       { kind: "derive", derive },
     ]);
@@ -98,16 +102,18 @@ export class Pipeline<T> {
     return steps;
   }
 
-  run(): T {
+  run(
+    ...args: HasDefault extends true ? [] | [data: Input] : [data: Input]
+  ): Output {
     if (!this.compiled) this.compiled = this.compile();
 
     const steps = this.compiled;
-    let value = this.data;
+    let value: unknown = args.length === 0 ? this.data : args[0];
 
     for (const step of steps) {
       value = step(value);
     }
 
-    return value as T;
+    return value as Output;
   }
 }

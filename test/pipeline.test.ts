@@ -308,4 +308,23 @@ describe("pipeline edge cases", () => {
     );
     expect(calls).toBe(0);
   });
+
+  it("accepts new input after derive without replacing the default", () => {
+    const pipeline = sculpt(10)
+      .transform((value) => value * 2)
+      .derive((value) => ({ value }));
+
+    expect(pipeline.run()).toEqual({ value: 20 });
+    expect(pipeline.run(5)).toEqual({ value: 10 });
+    expect(pipeline.run()).toEqual({ value: 20 });
+  });
+
+  it("distinguishes explicit undefined from omitted input", () => {
+    const pipeline = sculpt<number | undefined>(10).derive(
+      (value) => value ?? 0,
+    );
+
+    expect(pipeline.run()).toBe(10);
+    expect(pipeline.run(undefined)).toBe(0);
+  });
 });
