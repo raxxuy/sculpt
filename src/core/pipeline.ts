@@ -96,6 +96,27 @@ export class Pipeline<
     return steps;
   }
 
+  use<Next, OtherHasDefault extends boolean>(
+    pipeline: Pipeline<Output, Next, OtherHasDefault>,
+  ): Pipeline<Input, Next, HasDefault> {
+    const entries: Entry[] = [];
+
+    for (let node = pipeline.head; node; node = node.previous) {
+      entries.push(node.entry);
+    }
+
+    let head = this.head;
+
+    for (let index = entries.length - 1; index >= 0; index--) {
+      head = {
+        entry: entries[index] as Entry,
+        previous: head,
+      };
+    }
+
+    return new Pipeline<Input, Next, HasDefault>(this.data, head);
+  }
+
   run(
     ...args: HasDefault extends true ? [] | [data: Input] : [data: Input]
   ): Output {
