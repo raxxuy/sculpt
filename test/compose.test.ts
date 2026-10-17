@@ -10,13 +10,13 @@ describe("compose", () => {
   });
 
   it("applies a single transform", () => {
-    const transform = compose<number, number[]>((value) => value * 2);
+    const transform = compose<number>((value) => value * 2);
 
     expect(transform(10)).toBe(20);
   });
 
   it("applies transforms from left to right", () => {
-    const transform = compose<number, number[]>(
+    const transform = compose<number>(
       (value) => value + 5,
       (value) => value * 2,
       (value) => value - 3,
@@ -30,7 +30,7 @@ describe("compose", () => {
     const initial: Data = { value: 10 };
     const intermediate: Data = { value: 20 };
 
-    const transform = compose<Data, Data[]>(
+    const transform = compose<Data>(
       (data) => {
         expect(data).toBe(initial);
         return intermediate;
@@ -45,7 +45,7 @@ describe("compose", () => {
   });
 
   it("can be reused with different inputs", () => {
-    const transform = compose<number, number[]>(
+    const transform = compose<number>(
       (value) => value * 2,
       (value) => value + 1,
     );
@@ -56,8 +56,8 @@ describe("compose", () => {
   });
 
   it("supports nested compositions", () => {
-    const transform = compose<number, number[]>(
-      compose<number, number[]>(
+    const transform = compose<number>(
+      compose<number>(
         (value) => value + 5,
         (value) => value * 2,
       ),
@@ -71,7 +71,7 @@ describe("compose", () => {
     const error = new Error("Transform failed");
     let reachedLast = false;
 
-    const transform = compose<number, number[]>(
+    const transform = compose<number>(
       (value) => value + 1,
       () => {
         throw error;
@@ -107,7 +107,7 @@ describe("compose", () => {
       untouched: { active: true },
     };
 
-    const transform = compose<Data, Data[]>(
+    const transform = compose<Data>(
       at("value", (value) => value / 100),
       at("user.name", (name) => name.trim()),
     );
@@ -129,7 +129,7 @@ describe("compose", () => {
   it("supports sequential updates to the same path", () => {
     type Data = { value: number };
 
-    const transform = compose<Data, Data[]>(
+    const transform = compose<Data>(
       at("value", (value) => value * 2),
       at("value", (value) => value + 5),
     );
