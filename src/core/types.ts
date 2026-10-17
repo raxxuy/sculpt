@@ -35,3 +35,27 @@ export type Node = {
   entry: Entry;
   previous?: Node;
 };
+
+export type StepMetadata = {
+  kind: "transform" | "derive";
+  name?: string;
+};
+
+export type ExecutionPlan = {
+  steps: Step[];
+  metadata: StepMetadata[];
+};
+
+export type TraceStep = {
+  index: number;
+  kind: "transform" | "derive";
+  name?: string;
+  durationMs: number;
+  input: unknown;
+  output: unknown;
+};
+
+export type TraceResult<T> = {
+  result: T;
+  steps: TraceStep[];
+};
