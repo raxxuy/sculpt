@@ -23,10 +23,7 @@ describe("when", () => {
       score: data.score * 2,
     }));
 
-    const result = when(
-      (data) => data.score < 20,
-      transform,
-    )(input);
+    const result = when((data) => data.score < 20, transform)(input);
 
     expect(result).toBe(input);
     expect(transform).not.toHaveBeenCalled();
