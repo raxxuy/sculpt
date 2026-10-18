@@ -2,7 +2,6 @@ import { resolveTransforms } from "./resolve";
 import type {
   CheckedTransform,
   Derive,
-  Entry,
   ExecutionPlan,
   Node,
   Step,
@@ -15,6 +14,37 @@ import type {
 
 const emptyDependencies: string[] = [];
 
+const describe = (node: Node): StepMetadata =>
+  node.kind === "transform"
+    ? { kind: "transform", name: node.name }
+    : { kind: "derive" };
+
+const link = (
+  kind: Node["kind"],
+  name: string | undefined,
+  fn: Step,
+  after: string[],
+  previous?: Node,
+): Node => ({
+  kind,
+  name,
+  fn,
+  after,
+  previous,
+  size: previous === undefined ? 1 : previous.size + 1,
+  constrained: previous?.constrained || after.length > 0,
+});
+
+const declared = (head?: Node): Node[] => {
+  const size = head?.size ?? 0;
+  const nodes: Node[] = new Array(size);
+  let index = size;
+
+  for (let node = head; node; node = node.previous) nodes[--index] = node;
+
+  return nodes;
+};
+
 export class Pipeline<
   Input,
   Output = Input,
@@ -23,7 +53,7 @@ export class Pipeline<
   private compiled?: ExecutionPlan;
 
   constructor(
-    private readonly data: Input | undefined,
+    private readonly data?: Input,
     private readonly head?: Node,
   ) {}
 
@@ -50,80 +80,79 @@ export class Pipeline<
       throw new Error("Named transform requires transform function");
     }
 
-    return new Pipeline<Input, Output, HasDefault>(this.data, {
-      previous: this.head,
-      entry: {
-        kind: "transform",
-        name: named ? nameOrTransform : undefined,
-        transform: callback,
-        after: named && options?.after ? [...options.after] : emptyDependencies,
-      },
-    });
+    return new Pipeline<Input, Output, HasDefault>(
+      this.data,
+      link(
+        "transform",
+        named ? nameOrTransform : undefined,
+        callback,
+        named && options?.after ? [...options.after] : emptyDependencies,
+        this.head,
+      ),
+    );
   }
 
   derive<R>(derive: Derive<Output, R>): Pipeline<Input, R, HasDefault> {
-    return new Pipeline<Input, R, HasDefault>(this.data, {
-      previous: this.head,
-      entry: { kind: "derive", derive },
-    });
+    return new Pipeline<Input, R, HasDefault>(
+      this.data,
+      link("derive", undefined, derive, emptyDependencies, this.head),
+    );
   }
 
   private compile(): ExecutionPlan {
-    const entries: Entry[] = [];
+    const head = this.head;
 
-    for (let node = this.head; node; node = node.previous) {
-      entries.push(node.entry);
+    if (!head) return { steps: [] };
+
+    if (!head.constrained) {
+      const steps: Step[] = [];
+
+      for (let node: Node | undefined = head; node; node = node.previous) {
+        steps.push(node.fn);
+      }
+
+      return { steps: steps.reverse() };
     }
 
+    const nodes = declared(head);
     const steps: Step[] = [];
-    const metadata: StepMetadata[] = [];
-    const transforms: Extract<Entry, { kind: "transform" }>[] = [];
+    const order: Node[] = [];
+    const transforms: Node[] = [];
 
     const flush = () => {
-      for (const entry of resolveTransforms(transforms)) {
-        steps.push(entry.transform);
-        metadata.push({
-          kind: "transform",
-          name: entry.name,
-        });
+      for (const node of resolveTransforms(transforms)) {
+        steps.push(node.fn);
+        order.push(node);
       }
 
       transforms.length = 0;
     };
 
-    for (let index = entries.length - 1; index >= 0; index--) {
-      const entry = entries[index] as Entry;
+    for (let index = 0; index < nodes.length; index++) {
+      const node = nodes[index] as Node;
 
-      if (entry.kind === "transform") {
-        transforms.push(entry);
+      if (node.kind === "transform") {
+        transforms.push(node);
       } else {
         flush();
-        steps.push(entry.derive);
-        metadata.push({ kind: "derive" });
+        steps.push(node.fn);
+        order.push(node);
       }
     }
 
     flush();
 
-    return { steps, metadata };
+    return { steps, nodes: order };
   }
 
   use<Next, OtherHasDefault extends boolean>(
     pipeline: Pipeline<Output, Next, OtherHasDefault>,
   ): Pipeline<Input, Next, HasDefault> {
-    const entries: Entry[] = [];
-
-    for (let node = pipeline.head; node; node = node.previous) {
-      entries.push(node.entry);
-    }
-
+    const nodes = declared(pipeline.head);
     let head = this.head;
 
-    for (let index = entries.length - 1; index >= 0; index--) {
-      head = {
-        entry: entries[index] as Entry,
-        previous: head,
-      };
+    for (const node of nodes) {
+      head = link(node.kind, node.name, node.fn, node.after, head);
     }
 
     return new Pipeline<Input, Next, HasDefault>(this.data, head);
@@ -149,13 +178,14 @@ export class Pipeline<
   ): TraceResult<Output> {
     if (!this.compiled) this.compiled = this.compile();
 
-    const { steps, metadata } = this.compiled;
+    const { steps } = this.compiled;
+    const nodes = this.compiled.nodes ?? declared(this.head);
     const records: TraceStep[] = [];
     let value: unknown = args.length === 0 ? this.data : args[0];
 
     for (let index = 0; index < steps.length; index++) {
       const step = steps[index] as Step;
-      const info = metadata[index] as StepMetadata;
+      const info = describe(nodes[index] as Node);
       const input = value;
       const startedAt = performance.now();
 

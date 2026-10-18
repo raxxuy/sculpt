@@ -19,21 +19,14 @@ export type RegisteredTransform<T> = {
 // biome-ignore lint/suspicious/noExplicitAny: heterogeneous pipeline steps
 export type Step = (data: any) => any;
 
-export type Entry =
-  | {
-      kind: "transform";
-      name?: string;
-      transform: Step;
-      after: string[];
-    }
-  | {
-      kind: "derive";
-      derive: Step;
-    };
-
 export type Node = {
-  entry: Entry;
+  kind: "transform" | "derive";
+  name?: string;
+  fn: Step;
+  after: string[];
   previous?: Node;
+  size: number;
+  constrained: boolean;
 };
 
 export type StepMetadata = {
@@ -43,7 +36,7 @@ export type StepMetadata = {
 
 export type ExecutionPlan = {
   steps: Step[];
-  metadata: StepMetadata[];
+  nodes?: Node[];
 };
 
 export type TraceStep = {
