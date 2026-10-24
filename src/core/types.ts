@@ -34,6 +34,19 @@ export type StepMetadata = {
   name?: string;
 };
 
+export type InspectionStep = {
+  declaredIndex: number;
+  executionIndex: number;
+  scope: number;
+} & (
+  | { kind: "transform"; name?: string; after: string[] }
+  | { kind: "derive" }
+);
+
+export type PipelineInspection = {
+  steps: InspectionStep[];
+};
+
 export type ExecutionPlan = {
   steps: Step[];
   nodes?: Node[];
