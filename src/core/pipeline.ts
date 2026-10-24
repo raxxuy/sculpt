@@ -1,49 +1,15 @@
-import { resolveTransforms } from "./resolve";
+import { compile } from "./compile";
+import { execute, trace } from "./execute";
+import { append, emptyDependencies, link } from "./nodes";
 import type {
   CheckedTransform,
   Derive,
   ExecutionPlan,
   Node,
-  Step,
-  StepMetadata,
   TraceResult,
-  TraceStep,
   Transform,
   TransformOptions,
 } from "./types";
-
-const emptyDependencies: string[] = [];
-
-const describe = (node: Node): StepMetadata =>
-  node.kind === "transform"
-    ? { kind: "transform", name: node.name }
-    : { kind: "derive" };
-
-const link = (
-  kind: Node["kind"],
-  name: string | undefined,
-  fn: Step,
-  after: string[],
-  previous?: Node,
-): Node => ({
-  kind,
-  name,
-  fn,
-  after,
-  previous,
-  size: previous === undefined ? 1 : previous.size + 1,
-  constrained: previous?.constrained || after.length > 0,
-});
-
-const declared = (head?: Node): Node[] => {
-  const size = head?.size ?? 0;
-  const nodes: Node[] = new Array(size);
-  let index = size;
-
-  for (let node = head; node; node = node.previous) nodes[--index] = node;
-
-  return nodes;
-};
 
 export class Pipeline<
   Input,
@@ -51,6 +17,11 @@ export class Pipeline<
   HasDefault extends boolean = true,
 > {
   private compiled?: ExecutionPlan;
+
+  private get plan(): ExecutionPlan {
+    if (!this.compiled) this.compiled = compile(this.head);
+    return this.compiled;
+  }
 
   constructor(
     private readonly data?: Input,
@@ -99,110 +70,28 @@ export class Pipeline<
     );
   }
 
-  private compile(): ExecutionPlan {
-    const head = this.head;
-
-    if (!head) return { steps: [] };
-
-    if (!head.constrained) {
-      const steps: Step[] = [];
-
-      for (let node: Node | undefined = head; node; node = node.previous) {
-        steps.push(node.fn);
-      }
-
-      return { steps: steps.reverse() };
-    }
-
-    const nodes = declared(head);
-    const steps: Step[] = [];
-    const order: Node[] = [];
-    const transforms: Node[] = [];
-
-    const flush = () => {
-      for (const node of resolveTransforms(transforms)) {
-        steps.push(node.fn);
-        order.push(node);
-      }
-
-      transforms.length = 0;
-    };
-
-    for (let index = 0; index < nodes.length; index++) {
-      const node = nodes[index] as Node;
-
-      if (node.kind === "transform") {
-        transforms.push(node);
-      } else {
-        flush();
-        steps.push(node.fn);
-        order.push(node);
-      }
-    }
-
-    flush();
-
-    return { steps, nodes: order };
-  }
-
   use<Next, OtherHasDefault extends boolean>(
     pipeline: Pipeline<Output, Next, OtherHasDefault>,
   ): Pipeline<Input, Next, HasDefault> {
-    const nodes = declared(pipeline.head);
-    let head = this.head;
-
-    for (const node of nodes) {
-      head = link(node.kind, node.name, node.fn, node.after, head);
-    }
-
-    return new Pipeline<Input, Next, HasDefault>(this.data, head);
+    return new Pipeline<Input, Next, HasDefault>(
+      this.data,
+      append(this.head, pipeline.head),
+    );
   }
 
   run(
     ...args: HasDefault extends true ? [] | [data: Input] : [data: Input]
   ): Output {
-    if (!this.compiled) this.compiled = this.compile();
-
-    const { steps } = this.compiled;
-    let value: unknown = args.length === 0 ? this.data : args[0];
-
-    for (const step of steps) {
-      value = step(value);
-    }
-
-    return value as Output;
+    return execute<Output>(this.plan, args.length === 0 ? this.data : args[0]);
   }
 
   trace(
     ...args: HasDefault extends true ? [] | [data: Input] : [data: Input]
   ): TraceResult<Output> {
-    if (!this.compiled) this.compiled = this.compile();
-
-    const { steps } = this.compiled;
-    const nodes = this.compiled.nodes ?? declared(this.head);
-    const records: TraceStep[] = [];
-    let value: unknown = args.length === 0 ? this.data : args[0];
-
-    for (let index = 0; index < steps.length; index++) {
-      const step = steps[index] as Step;
-      const info = describe(nodes[index] as Node);
-      const input = value;
-      const startedAt = performance.now();
-
-      value = step(value);
-
-      records.push({
-        index,
-        ...info,
-        durationMs: performance.now() - startedAt,
-        input,
-        output: value,
-      });
-    }
-
-    return {
-      result: value as Output,
-      steps: records,
-    };
+    return trace<Output>(
+      this.plan,
+      this.head,
+      args.length === 0 ? this.data : args[0],
+    );
   }
 }
