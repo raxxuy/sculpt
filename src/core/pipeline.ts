@@ -1,11 +1,13 @@
 import { compile } from "./compile";
 import { execute, trace } from "./execute";
+import { inspect } from "./inspect";
 import { append, emptyDependencies, link } from "./nodes";
 import type {
   CheckedTransform,
   Derive,
   ExecutionPlan,
   Node,
+  PipelineInspection,
   TraceResult,
   Transform,
   TransformOptions,
@@ -77,6 +79,10 @@ export class Pipeline<
       this.data,
       append(this.head, pipeline.head),
     );
+  }
+
+  inspect(): PipelineInspection {
+    return inspect(this.plan, this.head);
   }
 
   run(
