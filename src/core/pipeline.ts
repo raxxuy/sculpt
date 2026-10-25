@@ -1,5 +1,5 @@
 import { compile } from "./compile";
-import { execute, trace } from "./execute";
+import { execute, executeAsync, trace, traceAsync } from "./execute";
 import { inspect } from "./inspect";
 import { append, emptyDependencies, link } from "./nodes";
 import type {
@@ -9,9 +9,12 @@ import type {
   Node,
   PipelineInspection,
   TraceResult,
-  Transform,
   TransformOptions,
 } from "./types";
+
+type ExecutionArgs<Input, HasDefault extends boolean> = HasDefault extends true
+  ? [] | [data: Input]
+  : [data: Input];
 
 export class Pipeline<
   Input,
@@ -30,19 +33,19 @@ export class Pipeline<
     private readonly head?: Node,
   ) {}
 
-  transform<R extends Output>(
+  transform<R extends Output | PromiseLike<Output>>(
     transform: CheckedTransform<Output, R>,
   ): Pipeline<Input, Output, HasDefault>;
 
-  transform<R extends Output>(
+  transform<R extends Output | PromiseLike<Output>>(
     name: string,
     transform: CheckedTransform<Output, R>,
     options?: TransformOptions,
   ): Pipeline<Input, Output, HasDefault>;
 
-  transform(
-    nameOrTransform: string | Transform<Output>,
-    transform?: Transform<Output>,
+  transform<R extends Output | PromiseLike<Output>>(
+    nameOrTransform: string | CheckedTransform<Output, R>,
+    transform?: CheckedTransform<Output, R>,
     options?: TransformOptions,
   ): Pipeline<Input, Output, HasDefault> {
     const named = typeof nameOrTransform === "string";
@@ -65,8 +68,10 @@ export class Pipeline<
     );
   }
 
-  derive<R>(derive: Derive<Output, R>): Pipeline<Input, R, HasDefault> {
-    return new Pipeline<Input, R, HasDefault>(
+  derive<R>(
+    derive: Derive<Output, R>,
+  ): Pipeline<Input, Awaited<R>, HasDefault> {
+    return new Pipeline<Input, Awaited<R>, HasDefault>(
       this.data,
       link("derive", undefined, derive, emptyDependencies, this.head),
     );
@@ -85,16 +90,31 @@ export class Pipeline<
     return inspect(this.plan, this.head);
   }
 
-  run(
-    ...args: HasDefault extends true ? [] | [data: Input] : [data: Input]
-  ): Output {
+  run(...args: ExecutionArgs<Input, HasDefault>): Output {
     return execute<Output>(this.plan, args.length === 0 ? this.data : args[0]);
   }
 
-  trace(
-    ...args: HasDefault extends true ? [] | [data: Input] : [data: Input]
-  ): TraceResult<Output> {
+  async runAsync(
+    ...args: ExecutionArgs<Input, HasDefault>
+  ): Promise<Awaited<Output>> {
+    return executeAsync<Output>(
+      this.plan,
+      args.length === 0 ? this.data : args[0],
+    );
+  }
+
+  trace(...args: ExecutionArgs<Input, HasDefault>): TraceResult<Output> {
     return trace<Output>(
+      this.plan,
+      this.head,
+      args.length === 0 ? this.data : args[0],
+    );
+  }
+
+  async traceAsync(
+    ...args: ExecutionArgs<Input, HasDefault>
+  ): Promise<TraceResult<Awaited<Output>>> {
+    return traceAsync<Output>(
       this.plan,
       this.head,
       args.length === 0 ? this.data : args[0],
