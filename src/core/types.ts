@@ -6,9 +6,12 @@ export type TransformOptions = {
   after?: string[];
 };
 
-export type CheckedTransform<T, R extends T> = (
+export type CheckedTransform<T, R extends T | PromiseLike<T>> = (
   data: T,
-) => R & Record<Exclude<keyof R, keyof T>, never>;
+) => R &
+  ([Awaited<R>] extends [never]
+    ? unknown
+    : Record<Exclude<keyof Awaited<R>, keyof T>, never>);
 
 export type RegisteredTransform<T> = {
   name?: string;
