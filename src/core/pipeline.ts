@@ -1,16 +1,23 @@
-import { compile } from "./compile";
-import { execute, executeAsync, trace, traceAsync } from "./execute";
-import { inspect } from "./inspect";
-import { append, emptyDependencies, link } from "./nodes";
+import * as compiler from "./compile";
+import * as execution from "./execute";
+import * as inspection from "./inspect";
+import * as nodeHelpers from "./nodes";
 import type {
   CheckedTransform,
   Derive,
   ExecutionPlan,
+  MaybePromise,
   Node,
   PipelineInspection,
   TraceResult,
   TransformOptions,
 } from "./types";
+
+// Capture stable helpers once to avoid module-loader getters on hot paths.
+const { compile } = compiler;
+const { executeAsync, trace, traceAsync } = execution;
+const { inspect } = inspection;
+const { append, emptyDependencies, link } = nodeHelpers;
 
 type ExecutionArgs<Input, HasDefault extends boolean> = HasDefault extends true
   ? [] | [data: Input]
@@ -21,29 +28,24 @@ export class Pipeline<
   Output = Input,
   HasDefault extends boolean = true,
 > {
-  private compiled?: ExecutionPlan;
-
-  private get plan(): ExecutionPlan {
-    if (!this.compiled) this.compiled = compile(this.head);
-    return this.compiled;
-  }
+  private plan?: ExecutionPlan;
 
   constructor(
     private readonly data?: Input,
     private readonly head?: Node,
   ) {}
 
-  transform<R extends Output | PromiseLike<Output>>(
+  transform<R extends MaybePromise<Output>>(
     transform: CheckedTransform<Output, R>,
   ): Pipeline<Input, Output, HasDefault>;
 
-  transform<R extends Output | PromiseLike<Output>>(
+  transform<R extends MaybePromise<Output>>(
     name: string,
     transform: CheckedTransform<Output, R>,
     options?: TransformOptions,
   ): Pipeline<Input, Output, HasDefault>;
 
-  transform<R extends Output | PromiseLike<Output>>(
+  transform<R extends MaybePromise<Output>>(
     nameOrTransform: string | CheckedTransform<Output, R>,
     transform?: CheckedTransform<Output, R>,
     options?: TransformOptions,
@@ -87,16 +89,29 @@ export class Pipeline<
   }
 
   inspect(): PipelineInspection {
+    if (!this.plan) this.plan = compile(this.head);
+
     return inspect(this.plan, this.head);
   }
 
   run(...args: ExecutionArgs<Input, HasDefault>): Output {
-    return execute<Output>(this.plan, args.length === 0 ? this.data : args[0]);
+    if (!this.plan) this.plan = compile(this.head);
+
+    const { steps } = this.plan;
+    let value: unknown = args.length === 0 ? this.data : args[0];
+
+    for (const step of steps) {
+      value = step(value);
+    }
+
+    return value as Output;
   }
 
   async runAsync(
     ...args: ExecutionArgs<Input, HasDefault>
   ): Promise<Awaited<Output>> {
+    if (!this.plan) this.plan = compile(this.head);
+
     return executeAsync<Output>(
       this.plan,
       args.length === 0 ? this.data : args[0],
@@ -104,6 +119,8 @@ export class Pipeline<
   }
 
   trace(...args: ExecutionArgs<Input, HasDefault>): TraceResult<Output> {
+    if (!this.plan) this.plan = compile(this.head);
+
     return trace<Output>(
       this.plan,
       this.head,
@@ -114,6 +131,8 @@ export class Pipeline<
   async traceAsync(
     ...args: ExecutionArgs<Input, HasDefault>
   ): Promise<TraceResult<Awaited<Output>>> {
+    if (!this.plan) this.plan = compile(this.head);
+
     return traceAsync<Output>(
       this.plan,
       this.head,

@@ -1,6 +1,9 @@
-import { declared } from "./nodes";
-import { resolveTransforms } from "./resolve";
+import * as nodeHelpers from "./nodes";
+import * as resolver from "./resolve";
 import type { ExecutionPlan, Node, Step } from "./types";
+
+const { declared } = nodeHelpers;
+const { resolveTransforms } = resolver;
 
 export const compile = (head?: Node): ExecutionPlan => {
   if (!head) return { steps: [] };

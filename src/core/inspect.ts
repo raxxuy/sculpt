@@ -1,10 +1,12 @@
-import { declared } from "./nodes";
+import * as nodeHelpers from "./nodes";
 import type {
   ExecutionPlan,
   InspectionStep,
   Node,
   PipelineInspection,
 } from "./types";
+
+const { declared } = nodeHelpers;
 
 export const inspect = (
   plan: ExecutionPlan,

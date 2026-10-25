@@ -1,4 +1,4 @@
-import { declared } from "./nodes";
+import * as nodeHelpers from "./nodes";
 import type {
   ExecutionPlan,
   Node,
@@ -7,6 +7,8 @@ import type {
   TraceResult,
   TraceStep,
 } from "./types";
+
+const { declared } = nodeHelpers;
 
 type Continuation = (value: unknown, next: Step) => unknown;
 
@@ -65,9 +67,6 @@ const traceWith = (
     steps: records,
   }));
 };
-
-export const execute = <Output>(plan: ExecutionPlan, input: unknown): Output =>
-  run(plan.steps, input, sync) as Output;
 
 export const executeAsync = async <Output>(
   plan: ExecutionPlan,

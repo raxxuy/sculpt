@@ -1,3 +1,5 @@
+export type MaybePromise<T> = T | PromiseLike<T>;
+
 export type Transform<T> = (data: T) => T;
 
 export type Derive<T, R> = (data: T) => R;
@@ -6,7 +8,7 @@ export type TransformOptions = {
   after?: string[];
 };
 
-export type CheckedTransform<T, R extends T | PromiseLike<T>> = (
+export type CheckedTransform<T, R extends MaybePromise<T>> = (
   data: T,
 ) => R &
   ([Awaited<R>] extends [never]

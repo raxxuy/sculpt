@@ -2,9 +2,14 @@ import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 import { type InspectionStep, type PipelineInspection, sculpt } from "../src";
 import * as compiler from "../src/core/compile";
 
+vi.mock("../src/core/compile", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../src/core/compile")>();
+  return { ...original, compile: vi.fn(original.compile) };
+});
+
 describe("inspect", () => {
   afterEach(() => {
-    vi.restoreAllMocks();
+    vi.clearAllMocks();
   });
 
   it("exposes the public inspection types without requiring an input", () => {
@@ -225,10 +230,10 @@ describe("inspect", () => {
     expect(derive).not.toHaveBeenCalled();
   });
 
-  it.each(["inspect", "run", "trace"] as const)(
+  it.each(["inspect", "run", "trace", "runAsync", "traceAsync"] as const)(
     "shares the compilation cache when %s is called first",
-    (firstMethod) => {
-      const compile = vi.spyOn(compiler, "compile");
+    async (firstMethod) => {
+      const compile = vi.mocked(compiler.compile);
       const callback = vi.fn((value: number) => value);
       const pipeline = sculpt(5)
         .transform("increment", (value) => callback(value + 1), {
@@ -237,7 +242,7 @@ describe("inspect", () => {
         .transform("double", (value) => callback(value * 2))
         .derive((value) => String(callback(value)));
 
-      pipeline[firstMethod]();
+      await pipeline[firstMethod]();
       expect(callback).toHaveBeenCalledTimes(firstMethod === "inspect" ? 0 : 3);
 
       const before = pipeline.inspect();
@@ -253,6 +258,10 @@ describe("inspect", () => {
       ]);
       expect(pipeline.inspect()).toStrictEqual(before);
       expect(callback).toHaveBeenCalledTimes(calls + 6);
+      await expect(pipeline.runAsync()).resolves.toBe("11");
+      await expect(pipeline.traceAsync(7)).resolves.toMatchObject({
+        result: "15",
+      });
       expect(compile).toHaveBeenCalledTimes(1);
     },
   );
