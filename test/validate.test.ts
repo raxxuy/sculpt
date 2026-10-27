@@ -9,7 +9,7 @@ describe("validate", () => {
     const result = validate(predicate, "Price must be non-negative")(input);
 
     expect(result).toBe(input);
-    expect(predicate).toHaveBeenCalledExactlyOnceWith(input);
+    expect(predicate).toHaveBeenNthCalledWith(1, input);
   });
 
   it("infers the current pipeline shape without changing its output type", () => {
@@ -75,7 +75,7 @@ describe("validate", () => {
     pipeline.inspect();
     expect(predicate).not.toHaveBeenCalled();
     expect(pipeline.run()).toBe(5);
-    expect(predicate).toHaveBeenCalledExactlyOnceWith(5);
+    expect(predicate).toHaveBeenNthCalledWith(1, 5);
   });
 
   it("supports tracing and stops on invalid input", () => {
