@@ -15,12 +15,6 @@ export type CheckedTransform<T, R extends MaybePromise<T>> = (
     ? unknown
     : Record<Exclude<keyof Awaited<R>, keyof T>, never>);
 
-export type RegisteredTransform<T> = {
-  name?: string;
-  transform: Transform<T>;
-  after: string[];
-};
-
 // biome-ignore lint/suspicious/noExplicitAny: heterogeneous pipeline steps
 export type Step = (data: any) => any;
 

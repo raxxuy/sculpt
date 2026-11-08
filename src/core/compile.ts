@@ -9,22 +9,40 @@ export const compile = (head?: Node): ExecutionPlan => {
   if (!head) return { steps: [] };
 
   if (!head.constrained) {
+    if (!head.previous) return { steps: [head.fn] };
+
     const steps: Step[] = [];
+    let names: Set<string> | undefined;
+    let duplicate = false;
 
     for (let node: Node | undefined = head; node; node = node.previous) {
       steps.push(node.fn);
+
+      if (node.kind === "derive") {
+        names?.clear();
+      } else if (node.name !== undefined) {
+        names ??= new Set();
+
+        if (names.has(node.name)) {
+          duplicate = true;
+          break;
+        }
+
+        names.add(node.name);
+      }
     }
 
-    return { steps: steps.reverse() };
+    if (!duplicate) return { steps: steps.reverse() };
   }
 
   const nodes = declared(head);
   const steps: Step[] = [];
   const order: Node[] = [];
   const transforms: Node[] = [];
+  let scope = 0;
 
   const flush = () => {
-    for (const node of resolveTransforms(transforms)) {
+    for (const node of resolveTransforms(transforms, scope)) {
       steps.push(node.fn);
       order.push(node);
     }
@@ -39,6 +57,7 @@ export const compile = (head?: Node): ExecutionPlan => {
       transforms.push(node);
     } else {
       flush();
+      scope++;
       steps.push(node.fn);
       order.push(node);
     }

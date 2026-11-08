@@ -1,25 +1,43 @@
-import type { RegisteredTransform } from "./types";
+import type { Node } from "./types";
 
-type Resolvable = Pick<RegisteredTransform<unknown>, "name" | "after">;
+type Resolvable = Pick<Node, "name" | "after" | "size">;
 
 export const resolveTransforms = <T extends Resolvable>(
   transforms: T[],
+  scope: number,
 ): T[] => {
-  const constrained = transforms.some(({ after }) => after.length > 0);
-  if (!constrained) return transforms;
+  if (transforms.length < 2 && !transforms[0]?.after.length) return transforms;
 
-  const done = new Set<string>();
+  const names = new Set<string>();
+  let ordered = true;
 
-  for (const { name, after } of transforms) {
-    if (!satisfied(after, done)) return reorder(transforms);
-    if (name !== undefined) done.add(name);
+  for (const { name, after, size } of transforms) {
+    if (ordered) {
+      for (const dependency of after) {
+        if (!names.has(dependency)) {
+          ordered = false;
+          break;
+        }
+      }
+    }
+
+    if (name !== undefined) {
+      if (names.has(name)) {
+        const first = transforms.find(
+          (transform) => transform.name === name,
+        ) as T;
+
+        throw new Error(
+          `Duplicate transform name ${JSON.stringify(name)} in scope ${scope} (declared indexes ${first.size - 1} and ${size - 1})`,
+        );
+      }
+
+      names.add(name);
+    }
   }
 
-  return transforms;
+  return ordered ? transforms : reorder(transforms);
 };
-
-const satisfied = (after: string[], done: Set<string>): boolean =>
-  after.every((dependency) => done.has(dependency));
 
 const push = (heap: number[], value: number) => {
   let i = heap.push(value) - 1;
@@ -92,7 +110,7 @@ const reorder = <T extends Resolvable>(transforms: T[]): T[] => {
     placed[index] = true;
     resolved.push(next);
 
-    if (next.name === undefined || done.has(next.name)) continue;
+    if (next.name === undefined) continue;
     done.add(next.name);
 
     for (const waiter of waiting.get(next.name) ?? []) {
@@ -106,21 +124,57 @@ const reorder = <T extends Resolvable>(transforms: T[]): T[] => {
     throw diagnose(
       transforms,
       transforms.filter((_, index) => !placed[index]),
+      done,
     );
   }
 
   return resolved;
 };
 
-const diagnose = <T extends Resolvable>(all: T[], blocked: T[]): Error => {
+const diagnose = <T extends Resolvable>(
+  all: T[],
+  blocked: T[],
+  done: Set<string>,
+): Error => {
   const known = new Set(all.map(({ name }) => name));
-  const missing = blocked
-    .flatMap(({ after }) => after)
-    .find((dependency) => !known.has(dependency));
 
-  return new Error(
-    missing !== undefined
-      ? `Unknown transform dependency "${missing}"`
-      : "Circular transform dependencies",
-  );
+  for (const { name, after } of blocked) {
+    for (const dependency of after) {
+      if (!known.has(dependency)) {
+        return new Error(
+          `Unknown transform dependency ${JSON.stringify(dependency)}${name === undefined ? "" : ` required by ${JSON.stringify(name)}`}`,
+        );
+      }
+    }
+  }
+
+  const named = new Map<string, T>();
+  for (const transform of blocked) {
+    if (transform.name !== undefined) named.set(transform.name, transform);
+  }
+
+  const path: string[] = [];
+  const visited = new Map<string, number>();
+  let current = blocked[0] as T;
+
+  if (current.name !== undefined) {
+    visited.set(current.name, path.length);
+    path.push(current.name);
+  }
+
+  // Every blocked transform has an unresolved dependency on another blocked transform.
+  while (true) {
+    const dependency = current.after.find((name) => !done.has(name)) as string;
+    const start = visited.get(dependency);
+
+    if (start !== undefined) {
+      return new Error(
+        `Circular transform dependencies: ${[...path.slice(start), dependency].map((name) => JSON.stringify(name)).join(" -> ")}`,
+      );
+    }
+
+    visited.set(dependency, path.length);
+    path.push(dependency);
+    current = named.get(dependency) as T;
+  }
 };
