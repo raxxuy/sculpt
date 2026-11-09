@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Transform } from "../src";
 import { sculpt } from "../src";
 import { at, compose } from "../src/transforms";
 
@@ -10,13 +11,13 @@ describe("compose", () => {
   });
 
   it("applies a single transform", () => {
-    const transform = compose<number>((value) => value * 2);
+    const transform: Transform<number> = compose((value) => value * 2);
 
     expect(transform(10)).toBe(20);
   });
 
   it("applies transforms from left to right", () => {
-    const transform = compose<number>(
+    const transform: Transform<number> = compose(
       (value) => value + 5,
       (value) => value * 2,
       (value) => value - 3,
@@ -30,7 +31,7 @@ describe("compose", () => {
     const initial: Data = { value: 10 };
     const intermediate: Data = { value: 20 };
 
-    const transform = compose<Data>(
+    const transform: Transform<Data> = compose(
       (data) => {
         expect(data).toBe(initial);
         return intermediate;
@@ -45,7 +46,7 @@ describe("compose", () => {
   });
 
   it("can be reused with different inputs", () => {
-    const transform = compose<number>(
+    const transform: Transform<number> = compose(
       (value) => value * 2,
       (value) => value + 1,
     );
@@ -56,8 +57,8 @@ describe("compose", () => {
   });
 
   it("supports nested compositions", () => {
-    const transform = compose<number>(
-      compose<number>(
+    const transform: Transform<number> = compose(
+      compose(
         (value) => value + 5,
         (value) => value * 2,
       ),
@@ -71,7 +72,7 @@ describe("compose", () => {
     const error = new Error("Transform failed");
     let reachedLast = false;
 
-    const transform = compose<number>(
+    const transform: Transform<number> = compose(
       (value) => value + 1,
       () => {
         throw error;
@@ -107,7 +108,7 @@ describe("compose", () => {
       untouched: { active: true },
     };
 
-    const transform = compose<Data>(
+    const transform: Transform<Data> = compose(
       at("value", (value) => value / 100),
       at("user.name", (name) => name.trim()),
     );
@@ -129,7 +130,7 @@ describe("compose", () => {
   it("supports sequential updates to the same path", () => {
     type Data = { value: number };
 
-    const transform = compose<Data>(
+    const transform: Transform<Data> = compose(
       at("value", (value) => value * 2),
       at("value", (value) => value + 5),
     );
@@ -151,5 +152,37 @@ describe("compose", () => {
       .run();
 
     expect(result).toBe(31);
+  });
+});
+
+describe("compose types", () => {
+  type Data = { value: number; user: { name: string } };
+  const data: Data = { value: 1, user: { name: " a " } };
+
+  it("rejects transforms that add properties", () => {
+    // @ts-expect-error extra is not part of Data
+    sculpt(data).transform(compose((x) => ({ ...x, extra: 1 })));
+
+    const standalone: Transform<Data> = compose(
+      at("value", (value) => value + 1),
+      // @ts-expect-error extra is not part of Data
+      (x) => ({ ...x, extra: 1 }),
+    );
+
+    expect(standalone).toBeTypeOf("function");
+  });
+
+  it("infers nested at() paths from context", () => {
+    const transform: Transform<Data> = compose(
+      at("value", (value) => value * 2),
+      compose(at("user.name", (name) => name.trim())),
+    );
+
+    expect(transform(data)).toEqual({ value: 2, user: { name: "a" } });
+    expect(
+      sculpt(data)
+        .transform(compose(at("value", (value) => value + 1)))
+        .run(),
+    ).toEqual({ value: 2, user: { name: " a " } });
   });
 });
