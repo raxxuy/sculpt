@@ -171,6 +171,7 @@ await runCase(
       depth < keys.length - 1
         ? setIn(target[key], keys, fn, depth + 1)
         : fn(target[key]);
+    if (Object.is(value, target[key])) return target;
     const copy = Array.isArray(target) ? [...target] : { ...target };
     copy[key] = value;
     return copy;

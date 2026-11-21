@@ -53,6 +53,9 @@ Duplicate names, unknown dependencies and cycles throw. `.derive()` and `.use()`
 they throw at that call. The last, still-open scope is checked on the first `run`, `trace` or `inspect` (a transform may
 still name a dependency declared later). Calling `inspect()` once validates a whole pipeline without running it.
 
+A step that throws during `run` or `trace` is rethrown as a `StepError` with `index`, `kind`, `step` (its name) and the
+original error as `cause`. From `trace` it also carries the completed `steps`.
+
 ## Transforms
 
 `sculpt/transforms`: `at`, `compose`, `each`, `eachWhen`, `when`, `validate`. They are pure and return the same

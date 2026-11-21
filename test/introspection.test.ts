@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { sculpt } from "../src";
+import { StepError, sculpt } from "../src";
 
 const id = (n: number) => n;
 
@@ -91,16 +91,27 @@ describe("trace", () => {
     expect(steps[1]?.durationMs).toBeGreaterThanOrEqual(4);
   });
 
-  it("propagates the original error and skips later steps", () => {
+  it("wraps a failure with its position and completed steps, skipping later steps", () => {
     const boom = new Error("boom");
     const later = vi.fn(id);
     const pipeline = sculpt(1)
-      .transform(() => {
+      .transform((n) => n + 1)
+      .transform("fail", () => {
         throw boom;
       })
       .transform(later);
 
-    expect(() => pipeline.trace()).toThrow(boom);
+    expect(() => pipeline.trace()).toThrow(StepError);
+    expect(() => pipeline.trace()).toThrow(
+      expect.objectContaining({
+        message: 'Step 1 (transform "fail") failed: boom',
+        index: 1,
+        kind: "transform",
+        step: "fail",
+        cause: boom,
+        steps: [expect.objectContaining({ output: 2 })],
+      }),
+    );
     expect(later).not.toHaveBeenCalled();
   });
 

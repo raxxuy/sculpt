@@ -60,6 +60,13 @@ describe("at", () => {
     expect(out.user.score).toBe(3);
   });
 
+  it("returns the same reference when the value is unchanged", () => {
+    const input = { user: { score: 1 }, other: {} };
+    const out = at<typeof input, "user.score">("user.score", (n) => n)(input);
+
+    expect(out).toBe(input);
+  });
+
   it("returns the same reference and never calls fn for no paths", () => {
     const fn = vi.fn((n: number) => n);
     const input = make();
@@ -140,14 +147,19 @@ describe("each", () => {
     expect(input).toEqual([1, 2, 3]);
   });
 
-  it("returns a new array for empty input without calling fn", () => {
+  it("returns the same array for empty input without calling fn", () => {
     const fn = vi.fn((n: number) => n);
     const input: number[] = [];
     const out = each(fn)(input);
 
-    expect(out).toEqual([]);
-    expect(out).not.toBe(input);
+    expect(out).toBe(input);
     expect(fn).not.toHaveBeenCalled();
+  });
+
+  it("returns the same array when every item is unchanged", () => {
+    const input = [{ a: 1 }, { a: 2 }];
+
+    expect(each<{ a: number }>((x) => x)(input)).toBe(input);
   });
 
   it("keeps sparse holes", () => {
@@ -221,13 +233,13 @@ describe("eachWhen", () => {
     expect(out[1]).toEqual({ v: 20 });
   });
 
-  it("returns a new array for empty input and calls nothing", () => {
+  it("returns the same array for empty input and calls nothing", () => {
     const predicate = vi.fn(() => true);
     const fn = vi.fn((n: number) => n);
     const input: number[] = [];
     const out = eachWhen(predicate, fn)(input);
 
-    expect(out).not.toBe(input);
+    expect(out).toBe(input);
     expect(predicate).not.toHaveBeenCalled();
     expect(fn).not.toHaveBeenCalled();
   });

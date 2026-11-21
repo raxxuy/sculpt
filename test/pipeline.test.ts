@@ -371,4 +371,22 @@ describe("failed validation", () => {
     expect(() => pipeline.run()).toThrow('Unknown transform dependency "nope"');
     expect(() => pipeline.run()).toThrow('Unknown transform dependency "nope"');
   });
+
+  it("wraps a run failure with the step position and keeps the cause", () => {
+    const boom = new Error("boom");
+    const pipeline = sculpt(1)
+      .derive((n) => n)
+      .transform(() => {
+        throw boom;
+      });
+
+    expect(() => pipeline.run()).toThrow(
+      expect.objectContaining({
+        message: "Step 1 (transform) failed: boom",
+        index: 1,
+        kind: "transform",
+        cause: boom,
+      }),
+    );
+  });
 });
