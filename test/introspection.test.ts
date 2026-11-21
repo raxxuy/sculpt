@@ -22,8 +22,7 @@ describe("trace", () => {
     expect(steps[1]).toMatchObject({ index: 1, input: 2, output: 4 });
   });
 
-  // Plan 4.5: name key is absent for anonymous steps. Old code sets name: undefined.
-  it.fails("omits the name key for anonymous steps", () => {
+  it("omits the name key for anonymous steps", () => {
     const { steps } = sculpt(1).transform(id).trace();
 
     expect("name" in (steps[0] as object)).toBe(false);

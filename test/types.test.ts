@@ -1,5 +1,5 @@
 import { describe, expectTypeOf, it } from "vitest";
-import { sculpt, type Transform } from "../src";
+import { type Pipeline, sculpt, type Transform } from "../src";
 import { type Extended, extend, omit, pick } from "../src/derivations";
 import { at, compose, each, eachWhen, validate, when } from "../src/transforms";
 
@@ -79,5 +79,33 @@ describe("types", () => {
 
     expectTypeOf(f).returns.toEqualTypeOf<Extended<D, { a: string }>>();
     expectTypeOf(f).returns.toEqualTypeOf<{ a: string; b: string }>();
+  });
+});
+
+describe("async removal and exports", () => {
+  it("transform rejects a callback returning a promise", () => {
+    const async = async (n: number) => n;
+    // @ts-expect-error promises are not allowed
+    sculpt(1).transform(async);
+  });
+
+  it("derive does not unwrap promises", () => {
+    const out = sculpt(1)
+      .derive(async (n) => n)
+      .run();
+
+    expectTypeOf(out).toEqualTypeOf<Promise<number>>();
+  });
+
+  it("has no runAsync or traceAsync", () => {
+    expectTypeOf(sculpt(1)).not.toHaveProperty("runAsync");
+    expectTypeOf(sculpt(1)).not.toHaveProperty("traceAsync");
+  });
+
+  it("exports Pipeline as a type", () => {
+    const build = (p: Pipeline<number>): Pipeline<number, string> =>
+      p.derive(String);
+
+    expectTypeOf(build).returns.toEqualTypeOf<Pipeline<number, string>>();
   });
 });

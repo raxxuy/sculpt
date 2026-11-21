@@ -168,24 +168,15 @@ describe("dependencies (after)", () => {
 
   it("resolves a 1,000-step reversed chain", () => {
     const log: Log = [];
-    let pipeline = sculpt(0).transform(
-      "t0",
-      (n) => {
-        log.push("t0");
-        return n;
-      },
-      { after: ["t1"] },
+    const pipeline = Array.from({ length: 1000 }, (_, i) => i).reduce(
+      (p, i) =>
+        p.transform(
+          `t${i}`,
+          logger(log, `t${i}`),
+          i < 999 ? { after: [`t${i + 1}`] } : undefined,
+        ),
+      sculpt(0),
     );
-    for (let i = 1; i < 1000; i++) {
-      pipeline = pipeline.transform(
-        `t${i}`,
-        (n) => {
-          log.push(`t${i}`);
-          return n;
-        },
-        i < 999 ? { after: [`t${i + 1}`] } : undefined,
-      );
-    }
     pipeline.run();
 
     expect(log).toHaveLength(1000);
@@ -238,8 +229,7 @@ describe("dependencies (after)", () => {
   });
 
   describe("build-time validation", () => {
-    // Plan 2.6: scopes closed by .derive() throw there. Old code throws on first run.
-    it.fails("throws at .derive() for a duplicate name", () => {
+    it("throws at .derive() for a duplicate name", () => {
       const pipeline = sculpt(1)
         .transform("t", (n) => n)
         .transform("t", (n) => n);
@@ -247,13 +237,13 @@ describe("dependencies (after)", () => {
       expect(() => pipeline.derive((n) => n)).toThrow("Duplicate");
     });
 
-    it.fails("throws at .derive() for an unknown dependency", () => {
+    it("throws at .derive() for an unknown dependency", () => {
       const pipeline = sculpt(1).transform("a", (n) => n, { after: ["x"] });
 
       expect(() => pipeline.derive((n) => n)).toThrow("Unknown");
     });
 
-    it.fails("throws at .derive() for a cycle", () => {
+    it("throws at .derive() for a cycle", () => {
       const pipeline = sculpt(1)
         .transform("a", (n) => n, { after: ["b"] })
         .transform("b", (n) => n, { after: ["a"] });
@@ -363,14 +353,14 @@ describe("use", () => {
     expect(() => pipeline.run()).toThrow("Circular");
   });
 
-  // Plan 2.6: .use() validates scopes it closes. Old code throws on first run.
-  it.fails("throws at .use() for a cycle in a scope that use closes", () => {
+  it("throws at .use() for an invalid scope that use closes", () => {
+    // A cycle can't cross into a scope use closes: the other pipeline's first scope must already be valid.
     const other = sculpt<number>()
-      .transform("b", (n) => n, { after: ["a"] })
+      .transform("b", (n) => n)
       .derive((n) => n);
-    const base = sculpt(1).transform("a", (n) => n, { after: ["b"] });
+    const base = sculpt(1).transform("a", (n) => n, { after: ["missing"] });
 
-    expect(() => base.use(other)).toThrow("Circular");
+    expect(() => base.use(other)).toThrow("Unknown transform dependency");
   });
 });
 

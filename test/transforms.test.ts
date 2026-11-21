@@ -52,7 +52,8 @@ describe("at", () => {
   it("handles overlapping paths", () => {
     const out = at<Data, "user" | "user.score">(
       ["user", "user.score"],
-      (v: any) => (typeof v === "number" ? v + 1 : { ...v, name: "z" }),
+      (v: number | Data["user"]) =>
+        typeof v === "number" ? v + 1 : { ...v, name: "z" },
     )(make());
 
     expect(out.user.name).toBe("z");
