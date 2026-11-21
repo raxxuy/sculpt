@@ -43,7 +43,7 @@ describe("types", () => {
   it("at infers paths and rejects bad ones", () => {
     type D = { a: { b: number } };
 
-    expectTypeOf(at<D, "a.b">("a.b", (n) => n)).toEqualTypeOf<(d: D) => D>();
+    expectTypeOf(at<D, "a.b">("a.b", (n) => n)).toEqualTypeOf<Transform<D>>();
     // @ts-expect-error invalid path
     at<D, "a.c">("a.c", (n) => n);
     // @ts-expect-error leaf cannot change type
@@ -188,5 +188,34 @@ describe("parse", () => {
     const pipeline = sculpt(1).derive(parse(schema));
 
     expectTypeOf(pipeline.run).returns.toEqualTypeOf<{ id: number }>();
+  });
+});
+
+describe("params", () => {
+  const base = sculpt<number>()
+    .params<{ factor: number }>()
+    .transform((n, { params }) => n * params.factor);
+
+  it("requires with before running and types the params", () => {
+    // @ts-expect-error params not bound
+    const _unbound = () => base.run(1);
+    // @ts-expect-error wrong params
+    base.with({ factor: "2" });
+    expectTypeOf(base.with({ factor: 2 }).run).returns.toEqualTypeOf<number>();
+  });
+
+  it("use merges params and requires binding again", () => {
+    const other = sculpt<number>().params<{ offset: number }>();
+    const merged = base.with({ factor: 2 }).use(other);
+
+    // @ts-expect-error new params not bound
+    const _unbound = () => merged.run(1);
+    // @ts-expect-error missing offset
+    merged.with({ factor: 2 });
+    merged.with({ factor: 2, offset: 1 }).run(1);
+  });
+
+  it("use keeps a bound pipeline bound when the other has no params", () => {
+    base.with({ factor: 2 }).use(sculpt<number>()).run(1);
   });
 });

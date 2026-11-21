@@ -7,9 +7,13 @@ export type {
   StandardSchemaV1,
 } from "./core/standard-schema";
 export type {
+  Context,
   Derive,
+  Fn,
   InspectionStep,
   PipelineInspection,
+  PipelineState,
+  Predicate,
   Transform,
   TransformOptions,
 } from "./core/types";
