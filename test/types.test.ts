@@ -3,8 +3,6 @@ import { type Pipeline, sculpt, type Transform } from "../src";
 import { type Extended, extend, omit, pick } from "../src/derivations";
 import { at, compose, each, eachWhen, validate, when } from "../src/transforms";
 
-// Phase 1 baseline: only assertions that hold on the current code.
-// Promise/Awaited, runAsync/traceAsync, Pipeline export and extend function form join in phase 4/5.
 describe("types", () => {
   it("transform rejects a callback that adds a key", () => {
     // @ts-expect-error extra key
@@ -41,9 +39,10 @@ describe("types", () => {
 
   it("compose infers T and rejects key-adding fns", () => {
     type D = { a: { b: number } };
-    const ok: Transform<D> = compose(at("a.b", (n) => n + 1));
+    const inferred: Transform<D> = compose(at("a.b", (n) => n + 1));
+    expectTypeOf(inferred).toEqualTypeOf<Transform<D>>();
     // @ts-expect-error extra key
-    const bad: Transform<{ a: number }> = compose((d) => ({ ...d, b: 1 }));
+    const _bad: Transform<{ a: number }> = compose((d) => ({ ...d, b: 1 }));
   });
 
   it("each/eachWhen/when reject shape-changing fns; predicates reject async", () => {
@@ -52,11 +51,11 @@ describe("types", () => {
     const identity = (n: number) => n;
 
     // @ts-expect-error extra key
-    const t0: Transform<{ a: number }[]> = each(addKey);
+    const _t0: Transform<{ a: number }[]> = each(addKey);
     // @ts-expect-error extra key
-    const t1: Transform<{ a: number }[]> = eachWhen(() => true, addKey);
+    const _t1: Transform<{ a: number }[]> = eachWhen(() => true, addKey);
     // @ts-expect-error extra key
-    const t2: Transform<{ a: number }> = when(() => true, addKey);
+    const _t2: Transform<{ a: number }> = when(() => true, addKey);
     // @ts-expect-error async predicate
     validate<number>(asyncPredicate, "m");
     // @ts-expect-error async predicate
@@ -82,7 +81,7 @@ describe("types", () => {
   });
 });
 
-describe("async removal and exports", () => {
+describe("no async support", () => {
   it("transform rejects a callback returning a promise", () => {
     const async = async (n: number) => n;
     // @ts-expect-error promises are not allowed
@@ -107,5 +106,18 @@ describe("async removal and exports", () => {
       p.derive(String);
 
     expectTypeOf(build).returns.toEqualTypeOf<Pipeline<number, string>>();
+  });
+});
+
+describe("extend function form", () => {
+  it("produces Extended<T, R> and overwrites with the new type", () => {
+    type D = { a: number; b: string };
+    const f = extend((d: D) => ({ a: String(d.a), c: true }));
+
+    expectTypeOf(f).returns.toEqualTypeOf<{
+      a: string;
+      b: string;
+      c: boolean;
+    }>();
   });
 });

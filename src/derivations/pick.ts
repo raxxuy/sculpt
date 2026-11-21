@@ -8,7 +8,7 @@ export const pick =
     const result = {} as Pick<T, K>;
 
     for (const key of keys) {
-      if (key in data) result[key] = data[key];
+      if (Object.hasOwn(data, key)) result[key] = data[key];
     }
 
     return result;

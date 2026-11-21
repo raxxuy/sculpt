@@ -11,8 +11,7 @@ describe("pick", () => {
     expect("tags" in pick<Data, "tags">("tags")(make())).toBe(false);
   });
 
-  // Plan 2.3: own properties only. Old code uses `in`.
-  it.fails("ignores inherited keys", () => {
+  it("ignores inherited keys", () => {
     const input = Object.create({ id: 9 }) as Data;
 
     expect("id" in pick<Data, "id">("id")(input)).toBe(false);
@@ -111,7 +110,7 @@ describe("extend object form", () => {
 
   it("shallow-copies with no fields", () => {
     const input = make();
-    const out = extend<Data, {}>({})(input);
+    const out = extend<Data, Record<never, never>>({})(input);
 
     expect(out).toEqual(input);
     expect(out).not.toBe(input);
@@ -127,33 +126,28 @@ describe("extend object form", () => {
   });
 });
 
-// Plan 2.4: function form. Old code only takes an object, so these fail (cast to bypass types).
 describe("extend function form", () => {
-  const fnForm = extend as never as <R>(
-    fn: (d: Data) => R,
-  ) => (d: Data) => Data & R;
-
-  it.fails("merges the result over the input and runs fn once", () => {
+  it("merges the result over the input and runs fn once", () => {
     const fn = vi.fn((d: Data) => ({ total: d.id * 2, label: d.name }));
-    const out = fnForm(fn)(make());
+    const out = extend(fn)(make());
 
     expect(out).toEqual({ ...make(), total: 2, label: "a" });
     expect(fn).toHaveBeenCalledTimes(1);
   });
 
-  it.fails("overwrites keys and leaves the input untouched", () => {
+  it("overwrites keys and leaves the input untouched", () => {
     const input = make();
-    const out = fnForm((d) => ({ id: d.id + 1 }))(input);
+    const out = extend((d: Data) => ({ id: d.id + 1 }))(input);
 
     expect(out.id).toBe(2);
     expect(input.id).toBe(1);
   });
 
-  it.fails("works inside a pipeline", () => {
+  it("works inside a pipeline", () => {
     const out = sculpt(make())
-      .derive(fnForm((d) => ({ total: d.id * 3 })) as never)
-      .transform((d: any) => ({ ...d, total: d.total + 1 }))
-      .run() as any;
+      .derive(extend((d) => ({ total: d.id * 3 })))
+      .transform((d) => ({ ...d, total: d.total + 1 }))
+      .run();
 
     expect(out.total).toBe(4);
   });
