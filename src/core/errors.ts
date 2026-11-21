@@ -18,3 +18,7 @@ export class StepError extends Error {
     this.steps = steps;
   }
 }
+
+export class ValidationError extends Error {
+  override name = "ValidationError";
+}

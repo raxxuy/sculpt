@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { sculpt, type Transform } from "../src";
+import { sculpt, type Transform, ValidationError } from "../src";
 import { at, compose, each, eachWhen, validate, when } from "../src/transforms";
 
 describe("at", () => {
@@ -260,6 +260,14 @@ describe("validate", () => {
 
     expect(() => pipeline.run()).toThrow("must be positive");
     expect(later).not.toHaveBeenCalled();
+    expect(() => validate<number>(() => false, "bad")(1)).toThrow(
+      ValidationError,
+    );
+    try {
+      pipeline.run();
+    } catch (error) {
+      expect((error as Error).cause).toBeInstanceOf(ValidationError);
+    }
   });
 
   it("propagates a predicate error unchanged", () => {
