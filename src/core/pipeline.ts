@@ -1,142 +1,163 @@
-import * as compiler from "./compile";
-import * as execution from "./execute";
-import * as inspection from "./inspect";
-import * as nodeHelpers from "./nodes";
+import { compile, openScope, orderScope } from "./compile";
+import { trace } from "./execute";
 import type {
   CheckedTransform,
   Derive,
-  ExecutionPlan,
-  MaybePromise,
+  InspectionStep,
   Node,
   PipelineInspection,
+  Plan,
+  Step,
   TraceResult,
   TransformOptions,
 } from "./types";
 
-// Capture stable helpers once to avoid module-loader getters on hot paths.
-const { compile } = compiler;
-const { executeAsync, trace, traceAsync } = execution;
-const { inspect } = inspection;
-const { append, emptyDependencies, link } = nodeHelpers;
-
 type ExecutionArgs<Input, HasDefault extends boolean> = HasDefault extends true
   ? [] | [data: Input]
   : [data: Input];
+
+const noDependencies: string[] = [];
+
+const append = (
+  previous: Node | undefined,
+  kind: Node["kind"],
+  fn: Step,
+  name?: string,
+  after = noDependencies,
+): Node => {
+  const closed = kind === "derive" ? openScope(previous) : undefined;
+
+  return {
+    kind,
+    name,
+    fn,
+    after,
+    index: previous ? previous.index + 1 : 0,
+    scope: previous ? previous.scope + (previous.kind === "derive" ? 1 : 0) : 0,
+    previous,
+    ordered: closed && orderScope(closed.transforms),
+    previousDerive: closed?.derive,
+  };
+};
+
+const toArray = (head?: Node) => {
+  const nodes: Node[] = [];
+
+  for (let node = head; node; node = node.previous) nodes.push(node);
+
+  return nodes.reverse();
+};
+
+const describe = (node: Node, executionIndex: number): InspectionStep => {
+  const position = {
+    declaredIndex: node.index,
+    executionIndex,
+    scope: node.scope,
+  };
+
+  return node.kind === "derive"
+    ? { ...position, kind: "derive" }
+    : {
+        ...position,
+        kind: "transform",
+        name: node.name,
+        after: [...node.after],
+      };
+};
 
 export class Pipeline<
   Input,
   Output = Input,
   HasDefault extends boolean = true,
 > {
-  private plan?: ExecutionPlan;
+  private plan?: Plan;
 
   constructor(
     private readonly data?: Input,
     private readonly head?: Node,
   ) {}
 
-  transform<R extends MaybePromise<Output>>(
+  transform<R extends Output>(
     transform: CheckedTransform<Output, R>,
   ): Pipeline<Input, Output, HasDefault>;
 
-  transform<R extends MaybePromise<Output>>(
+  transform<R extends Output>(
     name: string,
     transform: CheckedTransform<Output, R>,
     options?: TransformOptions,
   ): Pipeline<Input, Output, HasDefault>;
 
-  transform<R extends MaybePromise<Output>>(
+  transform<R extends Output>(
     nameOrTransform: string | CheckedTransform<Output, R>,
     transform?: CheckedTransform<Output, R>,
     options?: TransformOptions,
   ): Pipeline<Input, Output, HasDefault> {
-    const named = typeof nameOrTransform === "string";
-    const callback =
-      typeof nameOrTransform === "function" ? nameOrTransform : transform;
+    const fn =
+      typeof nameOrTransform === "string" ? transform : nameOrTransform;
 
-    if (typeof callback !== "function") {
+    if (typeof fn !== "function") {
       throw new Error("Named transform requires transform function");
     }
 
-    return new Pipeline<Input, Output, HasDefault>(
-      this.data,
-      link(
-        "transform",
-        named ? nameOrTransform : undefined,
-        callback,
-        named && options?.after ? [...options.after] : emptyDependencies,
-        this.head,
-      ),
-    );
+    const node =
+      typeof nameOrTransform === "string"
+        ? append(
+            this.head,
+            "transform",
+            fn,
+            nameOrTransform,
+            options?.after && [...options.after],
+          )
+        : append(this.head, "transform", fn);
+
+    return new Pipeline(this.data, node);
   }
 
-  derive<R>(
-    derive: Derive<Output, R>,
-  ): Pipeline<Input, Awaited<R>, HasDefault> {
-    return new Pipeline<Input, Awaited<R>, HasDefault>(
-      this.data,
-      link("derive", undefined, derive, emptyDependencies, this.head),
-    );
+  derive<R>(derive: Derive<Output, R>): Pipeline<Input, R, HasDefault> {
+    return new Pipeline(this.data, append(this.head, "derive", derive));
   }
 
   use<Next, OtherHasDefault extends boolean>(
-    pipeline: Pipeline<Output, Next, OtherHasDefault>,
+    other: Pipeline<Output, Next, OtherHasDefault>,
   ): Pipeline<Input, Next, HasDefault> {
-    return new Pipeline<Input, Next, HasDefault>(
-      this.data,
-      append(this.head, pipeline.head),
+    const head = toArray(other.head).reduce<Node | undefined>(
+      (previous, { kind, fn, name, after }) =>
+        append(previous, kind, fn, name, after),
+      this.head,
     );
+
+    return new Pipeline(this.data, head);
   }
 
   inspect(): PipelineInspection {
-    if (!this.plan) this.plan = compile(this.head);
-
-    return inspect(this.plan, this.head);
+    return { steps: this.compiled().nodes.map(describe) };
   }
 
   run(...args: ExecutionArgs<Input, HasDefault>): Output {
-    if (!this.plan) this.plan = compile(this.head);
-
-    const { steps } = this.plan;
-    let value: unknown = args.length === 0 ? this.data : args[0];
-
-    for (const step of steps) {
-      value = step(value);
-    }
-
-    return value as Output;
-  }
-
-  async runAsync(
-    ...args: ExecutionArgs<Input, HasDefault>
-  ): Promise<Awaited<Output>> {
-    if (!this.plan) this.plan = compile(this.head);
-
-    return executeAsync<Output>(
-      this.plan,
-      args.length === 0 ? this.data : args[0],
-    );
+    return this.compiled().steps.reduce(
+      (value, step) => step(value),
+      this.input(args),
+    ) as Output;
   }
 
   trace(...args: ExecutionArgs<Input, HasDefault>): TraceResult<Output> {
-    if (!this.plan) this.plan = compile(this.head);
-
-    return trace<Output>(
-      this.plan,
-      this.head,
-      args.length === 0 ? this.data : args[0],
-    );
+    return trace<Output>(this.compiled(), this.input(args));
   }
 
-  async traceAsync(
-    ...args: ExecutionArgs<Input, HasDefault>
-  ): Promise<TraceResult<Awaited<Output>>> {
-    if (!this.plan) this.plan = compile(this.head);
+  private input(args: unknown[]): unknown {
+    return args.length === 0 ? this.data : args[0];
+  }
 
-    return traceAsync<Output>(
-      this.plan,
-      this.head,
-      args.length === 0 ? this.data : args[0],
-    );
+  private compiled(): Plan {
+    this.plan ??= compile(this.head);
+    return this.plan;
   }
 }
+
+type Sculpt = {
+  <T>(): Pipeline<T, T, false>;
+  <T>(data: T): Pipeline<T, T, true>;
+};
+
+export const sculpt: Sculpt = <T>(data?: T) =>
+  new Pipeline<T, T, boolean>(data);

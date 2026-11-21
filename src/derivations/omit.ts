@@ -6,8 +6,8 @@ export const omit = <T extends object, K extends keyof T & string>(
   const omitted = new Set<string>(keys);
 
   return (data) => {
-    const result: Record<PropertyKey, unknown> = {};
     const source = data as Record<PropertyKey, unknown>;
+    const result: Record<PropertyKey, unknown> = {};
 
     for (const key in source) {
       if (Object.hasOwn(source, key) && !omitted.has(key)) {

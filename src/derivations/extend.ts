@@ -4,19 +4,24 @@ type Simplify<T> = { [K in keyof T]: T[K] } & {};
 
 export type Extended<T, R> = Simplify<Omit<T, keyof R> & R>;
 
-export const extend = <T extends object, R extends Record<string, unknown>>(
+export function extend<T extends object, R extends Record<string, unknown>>(
   fields: { [K in keyof R]: (data: T) => R[K] },
-): Derive<T, Extended<T, R>> => {
-  const keys = Object.keys(fields) as (keyof R & string)[];
-  const fns = keys.map((key) => fields[key]);
+): Derive<T, Extended<T, R>>;
+export function extend<T extends object, R extends object>(
+  fn: (data: T) => R,
+): Derive<T, Extended<T, R>>;
+export function extend<T extends object>(
+  arg: ((data: T) => object) | Record<string, (data: T) => unknown>,
+): Derive<T, object> {
+  if (typeof arg === "function") return (data) => ({ ...data, ...arg(data) });
+
+  const fields = Object.entries(arg);
 
   return (data) => {
     const result = { ...data } as Record<string, unknown>;
 
-    for (let i = 0; i < keys.length; i++) {
-      result[keys[i] as string] = (fns[i] as (data: T) => unknown)(data);
-    }
+    for (const [key, field] of fields) result[key] = field(data);
 
-    return result as Extended<T, R>;
+    return result;
   };
-};
+}

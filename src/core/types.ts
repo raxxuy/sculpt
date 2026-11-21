@@ -1,5 +1,3 @@
-export type MaybePromise<T> = T | PromiseLike<T>;
-
 export type Transform<T> = (data: T) => T;
 
 export type Derive<T, R> = (data: T) => R;
@@ -8,12 +6,10 @@ export type TransformOptions = {
   after?: string[];
 };
 
-export type CheckedTransform<T, R extends MaybePromise<T>> = (
+export type CheckedTransform<T, R extends T> = (
   data: T,
 ) => R &
-  ([Awaited<R>] extends [never]
-    ? unknown
-    : Record<Exclude<keyof Awaited<R>, keyof T>, never>);
+  ([R] extends [never] ? unknown : Record<Exclude<keyof R, keyof T>, never>);
 
 // biome-ignore lint/suspicious/noExplicitAny: heterogeneous pipeline steps
 export type Step = (data: any) => any;
@@ -23,14 +19,16 @@ export type Node = {
   name?: string;
   fn: Step;
   after: string[];
+  index: number;
+  scope: number;
   previous?: Node;
-  size: number;
-  constrained: boolean;
+  ordered?: Node[];
+  previousDerive?: Node;
 };
 
-export type StepMetadata = {
-  kind: "transform" | "derive";
-  name?: string;
+export type Plan = {
+  steps: Step[];
+  nodes: Node[];
 };
 
 export type InspectionStep = {
@@ -44,11 +42,6 @@ export type InspectionStep = {
 
 export type PipelineInspection = {
   steps: InspectionStep[];
-};
-
-export type ExecutionPlan = {
-  steps: Step[];
-  nodes?: Node[];
 };
 
 export type TraceStep = {

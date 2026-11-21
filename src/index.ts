@@ -1,8 +1,8 @@
-export { sculpt } from "./core/sculpt";
+export type { Pipeline } from "./core/pipeline";
+export { sculpt } from "./core/pipeline";
 export type {
   Derive,
   InspectionStep,
-  MaybePromise,
   PipelineInspection,
   Transform,
   TransformOptions,

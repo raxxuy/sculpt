@@ -1,4 +1,4 @@
-import { defineConfig } from "tsup";
+import { defineConfig } from "tsdown";
 
 export default defineConfig({
   entry: {
@@ -7,6 +7,8 @@ export default defineConfig({
     derivations: "src/derivations/index.ts",
   },
   format: ["esm", "cjs"],
+  fixedExtension: false,
   dts: true,
   clean: true,
+  target: false,
 });
