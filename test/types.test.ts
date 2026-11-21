@@ -1,10 +1,16 @@
 import { describe, expectTypeOf, it } from "vitest";
-import { type Pipeline, sculpt, type Transform } from "../src";
+import {
+  type Pipeline,
+  type StandardSchemaV1,
+  sculpt,
+  type Transform,
+} from "../src";
 import {
   defaults,
   type Extended,
   extend,
   omit,
+  parse,
   pick,
   rename,
 } from "../src/derivations";
@@ -172,5 +178,15 @@ describe("rename and defaults", () => {
       .run();
 
     expectTypeOf(out).toEqualTypeOf<{ n: number; b: string }>();
+  });
+});
+
+describe("parse", () => {
+  it("outputs the schema output type from any pipeline", () => {
+    const schema = {} as StandardSchemaV1<string, { id: number }>;
+
+    const pipeline = sculpt(1).derive(parse(schema));
+
+    expectTypeOf(pipeline.run).returns.toEqualTypeOf<{ id: number }>();
   });
 });
