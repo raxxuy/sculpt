@@ -88,13 +88,6 @@ export function compose<
   h: CheckedTransform<T, H>,
 ): Transform<T>;
 export function compose<T>(...transforms: Transform<T>[]): Transform<T> {
-  return (data) => {
-    let value = data;
-
-    for (const transform of transforms) {
-      value = transform(value);
-    }
-
-    return value;
-  };
+  return (data) =>
+    transforms.reduce((value, transform) => transform(value), data);
 }
