@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { sculpt } from "../src";
-import { extend, omit, pick } from "../src/derivations";
+import { defaults, extend, omit, pick, rename } from "../src/derivations";
 
 type Data = { id: number; name: string; secret: string; tags?: string[] };
 const make = (): Data => ({ id: 1, name: "a", secret: "s" });
@@ -150,5 +150,79 @@ describe("extend function form", () => {
       .run();
 
     expect(out.total).toBe(4);
+  });
+});
+
+describe("rename", () => {
+  it("renames keys, keeps the rest and leaves the input untouched", () => {
+    const input = make();
+    const out = rename<Data, { name: "label" }>({ name: "label" })(input);
+
+    expect(out).toEqual({ id: 1, label: "a", secret: "s" });
+    expect(input).toEqual(make());
+  });
+
+  it("skips missing and inherited keys", () => {
+    const input = Object.create({ name: "x" }) as Data;
+    input.id = 1;
+    const out = rename<Data, { name: "n"; tags: "t" }>({
+      name: "n",
+      tags: "t",
+    })(input);
+
+    expect(out).toEqual({ id: 1 });
+  });
+
+  it("overwrites an existing key with the renamed value", () => {
+    const out = rename<Data, { name: "secret" }>({ name: "secret" })(make());
+
+    expect(out).toEqual({ id: 1, secret: "a" });
+  });
+
+  it("swaps keys", () => {
+    const out = rename<Data, { id: "name"; name: "id" }>({
+      id: "name",
+      name: "id",
+    })(make());
+
+    expect(out).toEqual({ id: "a", name: 1, secret: "s" });
+  });
+
+  it("works inside a pipeline", () => {
+    const out = sculpt(make())
+      .derive(rename({ id: "key" }))
+      .transform((d) => ({ ...d, key: d.key + 1 }))
+      .run();
+
+    expect(out.key).toBe(2);
+  });
+});
+
+describe("defaults", () => {
+  it("fills missing and undefined keys, keeps defined ones", () => {
+    const fill = defaults<Data, { tags: string[]; name: string }>({
+      tags: ["x"],
+      name: "z",
+    });
+
+    expect(fill(make())).toEqual({ ...make(), tags: ["x"] });
+    expect(fill({ ...make(), name: undefined as never }).name).toBe("z");
+  });
+
+  it("returns a new object and leaves the input untouched", () => {
+    const input = make();
+    const out = defaults<Data, { tags: string[] }>({ tags: [] })(input);
+
+    expect(out).not.toBe(input);
+    expect(input).toEqual(make());
+  });
+
+  it("works inside a pipeline", () => {
+    const out = sculpt(make())
+      .derive(defaults({ tags: ["t"] }))
+      .transform((d) => ({ ...d, tags: [...d.tags, "u"] }))
+      .run();
+
+    expect(out.tags).toEqual(["t", "u"]);
   });
 });

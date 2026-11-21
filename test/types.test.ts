@@ -1,6 +1,13 @@
 import { describe, expectTypeOf, it } from "vitest";
 import { type Pipeline, sculpt, type Transform } from "../src";
-import { type Extended, extend, omit, pick } from "../src/derivations";
+import {
+  defaults,
+  type Extended,
+  extend,
+  omit,
+  pick,
+  rename,
+} from "../src/derivations";
 import { at, compose, each, eachWhen, validate, when } from "../src/transforms";
 
 describe("types", () => {
@@ -119,5 +126,51 @@ describe("extend function form", () => {
       b: string;
       c: boolean;
     }>();
+  });
+});
+
+describe("rename and defaults", () => {
+  type D = { a: number; b?: string };
+
+  it("rename maps keys, keeps optionality and rejects unknown keys", () => {
+    expectTypeOf(rename<D, { b: "c" }>({ b: "c" })).returns.toEqualTypeOf<{
+      a: number;
+      c?: string;
+    }>();
+    // @ts-expect-error unknown key
+    sculpt<D>({ a: 1 }).derive(rename({ a: "n", z: "c" }));
+  });
+
+  it("rename types a collision as the renamed value and supports swaps", () => {
+    type E = { a: number; b: string };
+    const base = sculpt<E>({ a: 1, b: "" });
+
+    expectTypeOf(base.derive(rename({ a: "b" })).run()).toEqualTypeOf<{
+      b: number;
+    }>();
+    expectTypeOf(base.derive(rename({ a: "b", b: "a" })).run()).toEqualTypeOf<{
+      a: string;
+      b: number;
+    }>();
+  });
+
+  it("defaults makes keys required and rejects unknown keys or bad values", () => {
+    expectTypeOf(defaults<D, { b: string }>({ b: "x" })).returns.toEqualTypeOf<{
+      a: number;
+      b: string;
+    }>();
+    // @ts-expect-error unknown key
+    defaults<D, { z: number }>({ z: 1 });
+    // @ts-expect-error wrong value type
+    defaults<D, { b: number }>({ b: 1 });
+  });
+
+  it("infers from the pipeline", () => {
+    const out = sculpt<D>({ a: 1 })
+      .derive(defaults({ b: "x" }))
+      .derive(rename({ a: "n" }))
+      .run();
+
+    expectTypeOf(out).toEqualTypeOf<{ n: number; b: string }>();
   });
 });
