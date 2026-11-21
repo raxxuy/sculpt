@@ -72,7 +72,7 @@ sculpt({ user: { score: 1 }, tags: ["a"] })
 
 ## Derivations
 
-`sculpt/derivations`: `pick`, `omit`, `extend`. They only read own properties and always return a new object.
+`sculpt/derivations`: `pick`, `omit`, `extend`, `rename`, `defaults`. They only read own properties and always return a new object.
 
 ```ts
 import { extend, omit, pick } from "sculpt/derivations";
