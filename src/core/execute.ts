@@ -1,3 +1,4 @@
+import { StepError } from "./errors";
 import type { Plan, TraceResult, TraceStep } from "./types";
 
 export const trace = <Output>(
@@ -8,18 +9,23 @@ export const trace = <Output>(
 
   const result = plan.nodes.reduce((value, node, index) => {
     const startedAt = performance.now();
-    const output = node.fn(value);
 
-    steps.push({
-      index,
-      kind: node.kind,
-      ...(node.name !== undefined && { name: node.name }),
-      durationMs: performance.now() - startedAt,
-      input: value,
-      output,
-    });
+    try {
+      const output = node.fn(value);
 
-    return output;
+      steps.push({
+        index,
+        kind: node.kind,
+        ...(node.name !== undefined && { name: node.name }),
+        durationMs: performance.now() - startedAt,
+        input: value,
+        output,
+      });
+
+      return output;
+    } catch (error) {
+      throw new StepError(node, index, error, steps);
+    }
   }, input);
 
   return { result: result as Output, steps };

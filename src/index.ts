@@ -1,3 +1,4 @@
+export { StepError } from "./core/errors";
 export type { Pipeline } from "./core/pipeline";
 export { sculpt } from "./core/pipeline";
 export type {

@@ -22,10 +22,14 @@ const update = (
   depth: number,
 ): any => {
   const key = keys[depth] as string;
+  const current = data[key];
   const value =
     depth < keys.length - 1
-      ? update(data[key], keys, fn, depth + 1)
-      : fn(data[key]);
+      ? update(current, keys, fn, depth + 1)
+      : fn(current);
+
+  if (Object.is(value, current)) return data;
+
   const copy = Array.isArray(data) ? [...data] : { ...data };
 
   copy[key] = value;

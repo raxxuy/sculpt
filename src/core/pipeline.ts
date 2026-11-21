@@ -1,4 +1,5 @@
 import { compile, openScope, orderScope } from "./compile";
+import { StepError } from "./errors";
 import { trace } from "./execute";
 import type {
   CheckedTransform,
@@ -134,10 +135,15 @@ export class Pipeline<
   }
 
   run(...args: ExecutionArgs<Input, HasDefault>): Output {
-    return this.compiled().steps.reduce(
-      (value, step) => step(value),
-      this.input(args),
-    ) as Output;
+    const { steps, nodes } = this.compiled();
+
+    return steps.reduce((value, step, index) => {
+      try {
+        return step(value);
+      } catch (error) {
+        throw new StepError(nodes[index] as Node, index, error);
+      }
+    }, this.input(args)) as Output;
   }
 
   trace(...args: ExecutionArgs<Input, HasDefault>): TraceResult<Output> {
