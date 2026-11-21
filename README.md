@@ -41,6 +41,20 @@ dependency has run and is queued behind the ones already ready (FIFO). Dependenc
 
 `use(other)` appends another pipeline's steps (its default data is ignored). Callbacks are not run while composing.
 
+### params
+
+`params<P>()` declares parameters; `with(params)` binds them and returns a new pipeline. Every step, including those
+inside helpers, receives them as `context.params`. `run` and `trace` are type errors until params are bound. `use`
+merges the other pipeline's params.
+
+```ts
+const scale = sculpt<number>()
+  .params<{ factor: number }>()
+  .transform((n, { params }) => n * params.factor);
+
+scale.with({ factor: 2 }).run(3); // 6
+```
+
 ### run, trace, inspect
 
 - `run(input?)` runs the pipeline. An explicit `undefined` counts as input.

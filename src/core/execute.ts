@@ -1,9 +1,10 @@
 import { StepError } from "./errors";
-import type { Plan, TraceResult, TraceStep } from "./types";
+import type { Context, Plan, TraceResult, TraceStep } from "./types";
 
 export const trace = <Output>(
   plan: Plan,
   input: unknown,
+  context: Context,
 ): TraceResult<Output> => {
   const steps: TraceStep[] = [];
 
@@ -11,7 +12,7 @@ export const trace = <Output>(
     const startedAt = performance.now();
 
     try {
-      const output = node.fn(value);
+      const output = node.fn(value, context);
 
       steps.push({
         index,

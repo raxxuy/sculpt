@@ -3,19 +3,29 @@ import { StepError } from "./errors";
 import { trace } from "./execute";
 import type {
   CheckedTransform,
+  Context,
+  DefaultState,
   Derive,
   InspectionStep,
   Node,
+  Patch,
   PipelineInspection,
+  PipelineState,
   Plan,
   Step,
   TraceResult,
   TransformOptions,
 } from "./types";
 
-type ExecutionArgs<Input, HasDefault extends boolean> = HasDefault extends true
-  ? [] | [data: Input]
-  : [data: Input];
+type ExecutionArgs<Input, S extends PipelineState> = S["bound"] extends true
+  ? S["hasDefault"] extends true
+    ? [] | [data: Input]
+    : [data: Input]
+  : never;
+
+type Cache = { plan?: Plan };
+
+const noParams: Context = { params: undefined };
 
 const noDependencies: string[] = [];
 
@@ -69,30 +79,30 @@ const describe = (node: Node, executionIndex: number): InspectionStep => {
 export class Pipeline<
   Input,
   Output = Input,
-  HasDefault extends boolean = true,
+  S extends PipelineState = DefaultState,
 > {
-  private plan?: Plan;
-
   constructor(
     private readonly data?: Input,
     private readonly head?: Node,
+    private readonly context: Context = noParams,
+    private readonly cache: Cache = {},
   ) {}
 
   transform<R extends Output>(
-    transform: CheckedTransform<Output, R>,
-  ): Pipeline<Input, Output, HasDefault>;
+    transform: CheckedTransform<Output, R, S["params"]>,
+  ): Pipeline<Input, Output, S>;
 
   transform<R extends Output>(
     name: string,
-    transform: CheckedTransform<Output, R>,
+    transform: CheckedTransform<Output, R, S["params"]>,
     options?: TransformOptions,
-  ): Pipeline<Input, Output, HasDefault>;
+  ): Pipeline<Input, Output, S>;
 
   transform<R extends Output>(
-    nameOrTransform: string | CheckedTransform<Output, R>,
-    transform?: CheckedTransform<Output, R>,
+    nameOrTransform: string | CheckedTransform<Output, R, S["params"]>,
+    transform?: CheckedTransform<Output, R, S["params"]>,
     options?: TransformOptions,
-  ): Pipeline<Input, Output, HasDefault> {
+  ): Pipeline<Input, Output, S> {
     const fn =
       typeof nameOrTransform === "string" ? transform : nameOrTransform;
 
@@ -105,49 +115,77 @@ export class Pipeline<
         ? append(
             this.head,
             "transform",
-            fn,
+            fn as Step,
             nameOrTransform,
             options?.after && [...options.after],
           )
-        : append(this.head, "transform", fn);
+        : append(this.head, "transform", fn as Step);
 
-    return new Pipeline(this.data, node);
+    return new Pipeline(this.data, node, this.context);
   }
 
-  derive<R>(derive: Derive<Output, R>): Pipeline<Input, R, HasDefault> {
-    return new Pipeline(this.data, append(this.head, "derive", derive));
+  derive<R>(derive: Derive<Output, R, S["params"]>): Pipeline<Input, R, S> {
+    return new Pipeline(
+      this.data,
+      append(this.head, "derive", derive as Step),
+      this.context,
+    );
   }
 
-  use<Next, OtherHasDefault extends boolean>(
-    other: Pipeline<Output, Next, OtherHasDefault>,
-  ): Pipeline<Input, Next, HasDefault> {
+  use<Next, Other extends PipelineState>(
+    other: Pipeline<Output, Next, Other>,
+  ): Pipeline<
+    Input,
+    Next,
+    Patch<
+      S,
+      {
+        params: S["params"] & Other["params"];
+        bound: unknown extends Other["params"] ? S["bound"] : false;
+      }
+    >
+  > {
     const head = toArray(other.head).reduce<Node | undefined>(
       (previous, { kind, fn, name, after }) =>
         append(previous, kind, fn, name, after),
       this.head,
     );
 
-    return new Pipeline(this.data, head);
+    return new Pipeline(this.data, head, this.context);
+  }
+
+  params<Params>(): Pipeline<
+    Input,
+    Output,
+    Patch<S, { params: S["params"] & Params; bound: false }>
+  > {
+    return new Pipeline(this.data, this.head, this.context, this.cache);
+  }
+
+  with(
+    params: S["params"],
+  ): Pipeline<Input, Output, Patch<S, { bound: true }>> {
+    return new Pipeline(this.data, this.head, { params }, this.cache);
   }
 
   inspect(): PipelineInspection {
     return { steps: this.compiled().nodes.map(describe) };
   }
 
-  run(...args: ExecutionArgs<Input, HasDefault>): Output {
+  run(...args: ExecutionArgs<Input, S>): Output {
     const { steps, nodes } = this.compiled();
 
     return steps.reduce((value, step, index) => {
       try {
-        return step(value);
+        return step(value, this.context);
       } catch (error) {
         throw new StepError(nodes[index] as Node, index, error);
       }
     }, this.input(args)) as Output;
   }
 
-  trace(...args: ExecutionArgs<Input, HasDefault>): TraceResult<Output> {
-    return trace<Output>(this.compiled(), this.input(args));
+  trace(...args: ExecutionArgs<Input, S>): TraceResult<Output> {
+    return trace<Output>(this.compiled(), this.input(args), this.context);
   }
 
   private input(args: unknown[]): unknown {
@@ -155,15 +193,14 @@ export class Pipeline<
   }
 
   private compiled(): Plan {
-    this.plan ??= compile(this.head);
-    return this.plan;
+    this.cache.plan ??= compile(this.head);
+    return this.cache.plan;
   }
 }
 
 type Sculpt = {
-  <T>(): Pipeline<T, T, false>;
-  <T>(data: T): Pipeline<T, T, true>;
+  <T>(): Pipeline<T, T, Patch<DefaultState, { hasDefault: false }>>;
+  <T>(data: T): Pipeline<T, T>;
 };
 
-export const sculpt: Sculpt = <T>(data?: T) =>
-  new Pipeline<T, T, boolean>(data);
+export const sculpt: Sculpt = <T>(data?: T) => new Pipeline<T, T>(data);

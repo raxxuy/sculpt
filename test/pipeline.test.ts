@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { sculpt } from "../src";
+import { extend } from "../src/derivations";
+import { at, compose, each, eachWhen, validate, when } from "../src/transforms";
 
 type Log = string[];
 const logger = (log: Log, name: string) => (n: number) => {
@@ -388,5 +390,68 @@ describe("failed validation", () => {
         cause: boom,
       }),
     );
+  });
+});
+
+describe("params", () => {
+  const scaled = sculpt<number>()
+    .params<{ factor: number }>()
+    .transform((n, { params }) => n * params.factor);
+
+  it("passes bound params to steps and leaves the original unbound", () => {
+    const double = scaled.with({ factor: 2 });
+
+    expect(double.run(3)).toBe(6);
+    expect(scaled.with({ factor: 10 }).run(3)).toBe(30);
+    expect(double.trace(3).result).toBe(6);
+  });
+
+  it("is forwarded by every helper", () => {
+    type D = { a: { b: number }; list: number[] };
+    type P = { add: number };
+    const out = sculpt<D>({ a: { b: 1 }, list: [1, 2] })
+      .params<P>()
+      .transform(at("a.b", (n, { params }) => n + params.add))
+      .transform(
+        at(
+          "list",
+          each((n, { params }) => n + params.add),
+        ),
+      )
+      .transform(
+        at(
+          "list",
+          eachWhen(
+            (n, { params }) => n > params.add,
+            (n) => -n,
+          ),
+        ),
+      )
+      .transform(
+        when(
+          (_, { params }) => params.add > 0,
+          compose((d, { params }) => ({ ...d, a: { b: d.a.b * params.add } })),
+        ),
+      )
+      .transform(validate((_, { params }) => params.add === 10, "bad"))
+      .derive(extend({ added: (_, { params }) => params.add }))
+      .derive(extend((d, { params }) => ({ total: d.a.b + params.add })))
+      .with({ add: 10 })
+      .run();
+
+    expect(out).toEqual({
+      a: { b: 110 },
+      list: [-11, -12],
+      added: 10,
+      total: 120,
+    });
+  });
+
+  it("use merges params from both pipelines", () => {
+    const offset = sculpt<number>()
+      .params<{ offset: number }>()
+      .transform((n, { params }) => n + params.offset);
+
+    expect(scaled.use(offset).with({ factor: 2, offset: 1 }).run(3)).toBe(7);
   });
 });

@@ -1,5 +1,5 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: paths are checked by Path<T>, values are untyped at runtime */
-import type { CheckedTransform, Transform } from "../core/types";
+import type { CheckedTransform, Context, Transform } from "../core/types";
 
 type Path<T> = T extends readonly unknown[]
   ? never
@@ -20,13 +20,14 @@ const update = (
   keys: string[],
   fn: Transform<any>,
   depth: number,
+  context?: Context<any>,
 ): any => {
   const key = keys[depth] as string;
   const current = data[key];
   const value =
     depth < keys.length - 1
-      ? update(current, keys, fn, depth + 1)
-      : fn(current);
+      ? update(current, keys, fn, depth + 1, context)
+      : fn(current, context);
 
   if (Object.is(value, current)) return data;
 
@@ -41,17 +42,19 @@ export const at = <
   T,
   P extends Path<T>,
   R extends PathValue<T, P> = PathValue<T, P>,
+  Params = unknown,
 >(
   path: P | readonly P[],
-  transform: CheckedTransform<PathValue<T, P>, R>,
-): Transform<T> => {
+  transform: CheckedTransform<PathValue<T, P>, R, Params>,
+): Transform<T, Params> => {
   const targets = (typeof path === "string" ? [path] : path).map((p) =>
     p.split("."),
   );
 
-  return (data) =>
+  return ((data: T, context?: Context<Params>) =>
     targets.reduce(
-      (value, keys) => update(value, keys, transform as Transform<any>, 0),
+      (value, keys) =>
+        update(value, keys, transform as Transform<any>, 0, context),
       data,
-    );
+    )) as Transform<T, Params>;
 };

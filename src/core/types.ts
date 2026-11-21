@@ -1,18 +1,48 @@
-export type Transform<T> = (data: T) => T;
+export type Context<Params = unknown> = { readonly params: Params };
 
-export type Derive<T, R> = (data: T) => R;
+export type ContextArgs<Params> = unknown extends Params
+  ? [context?: Context<Params>]
+  : [context: Context<Params>];
+
+export type Fn<T, R, Params = unknown> = (
+  data: T,
+  ...context: ContextArgs<Params>
+) => R;
+
+export type Transform<T, Params = unknown> = Fn<T, T, Params>;
+
+export type Derive<T, R, Params = unknown> = Fn<T, R, Params>;
+
+export type Predicate<T, Params = unknown> = Fn<T, boolean, Params>;
 
 export type TransformOptions = {
   after?: string[];
 };
 
-export type CheckedTransform<T, R extends T> = (
-  data: T,
-) => R &
-  ([R] extends [never] ? unknown : Record<Exclude<keyof R, keyof T>, never>);
+export type CheckedTransform<T, R extends T, Params = unknown> = Fn<
+  T,
+  R &
+    ([R] extends [never] ? unknown : Record<Exclude<keyof R, keyof T>, never>),
+  Params
+>;
+
+export type PipelineState = {
+  hasDefault: boolean;
+  params: unknown;
+  bound: boolean;
+};
+
+export type DefaultState = { hasDefault: true; params: unknown; bound: true };
+
+export type Patch<
+  S extends PipelineState,
+  Changes extends Partial<PipelineState>,
+> = {
+  [K in keyof S]: K extends keyof Changes ? Changes[K] : S[K];
+};
 
 // biome-ignore lint/suspicious/noExplicitAny: heterogeneous pipeline steps
-export type Step = (data: any) => any;
+export type Step = (data: any, context?: Context<any>) => any;
 
 export type Node = {
   kind: "transform" | "derive";
