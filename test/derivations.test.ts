@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import { sculpt } from "../src";
-import { defaults, extend, omit, pick, rename } from "../src/derivations";
+import { type StandardSchemaV1, sculpt, ValidationError } from "../src";
+import {
+  defaults,
+  extend,
+  omit,
+  parse,
+  pick,
+  rename,
+} from "../src/derivations";
 
 type Data = { id: number; name: string; secret: string; tags?: string[] };
 const make = (): Data => ({ id: 1, name: "a", secret: "s" });
@@ -224,5 +231,63 @@ describe("defaults", () => {
       .run();
 
     expect(out.tags).toEqual(["t", "u"]);
+  });
+});
+
+describe("parse", () => {
+  const positive: StandardSchemaV1<unknown, { n: number }> = {
+    "~standard": {
+      version: 1,
+      vendor: "test",
+      validate: (value) => {
+        const n = (value as { n?: unknown }).n;
+        return typeof n === "number" && n > 0
+          ? { value: { n } }
+          : {
+              issues: [
+                { message: "must be positive", path: [{ key: "n" }] },
+                { message: "bad" },
+              ],
+            };
+      },
+    },
+  };
+
+  it("returns the schema output", () => {
+    expect(parse(positive)({ n: 1, extra: true })).toEqual({ n: 1 });
+  });
+
+  it("throws a ValidationError with every issue", () => {
+    expect(() => parse(positive)({ n: -1 })).toThrow(ValidationError);
+    expect(() => parse(positive)({ n: -1 })).toThrow(
+      "n: must be positive; bad",
+    );
+
+    try {
+      parse(positive)({ n: -1 });
+    } catch (error) {
+      expect((error as ValidationError).issues).toHaveLength(2);
+    }
+  });
+
+  it("rejects async schemas", () => {
+    const async: StandardSchemaV1 = {
+      "~standard": {
+        version: 1,
+        vendor: "test",
+        validate: async (value) => ({ value }),
+      },
+    };
+
+    expect(() => parse(async)(1)).toThrow("Async schemas are not supported");
+  });
+
+  it("works inside a pipeline", () => {
+    const out = sculpt<unknown>()
+      .derive(parse(positive))
+      .transform((d) => ({ ...d, n: d.n + 1 }))
+      .run({ n: 1 });
+
+    expect(out).toEqual({ n: 2 });
   });
 });

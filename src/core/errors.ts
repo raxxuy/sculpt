@@ -1,3 +1,4 @@
+import type { StandardSchemaIssue } from "./standard-schema";
 import type { Node, TraceStep } from "./types";
 
 export class StepError extends Error {
@@ -21,4 +22,13 @@ export class StepError extends Error {
 
 export class ValidationError extends Error {
   override name = "ValidationError";
+  readonly issues: ReadonlyArray<StandardSchemaIssue>;
+
+  constructor(
+    message: string,
+    issues: ReadonlyArray<StandardSchemaIssue> = [{ message }],
+  ) {
+    super(message);
+    this.issues = issues;
+  }
 }
