@@ -47,7 +47,8 @@
     "test": "vitest",
     "typecheck": "tsc --noEmit",
     "biome": "biome check",
-    "check": "npm run typecheck && npm test && npm run biome && npm run build"
+    "check": "npm run typecheck && npm test && npm run biome && npm run build",
+    "bench": "npm run build && node bench/run.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",
