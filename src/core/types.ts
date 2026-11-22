@@ -9,6 +9,11 @@ export type Fn<T, R, Params = unknown> = (
   ...context: ContextArgs<Params>
 ) => R;
 
+export type Call<T, R, Params = unknown> = (
+  data: T,
+  context?: Context<Params>,
+) => R;
+
 export type Transform<T, Params = unknown> = Fn<T, T, Params>;
 
 export type Derive<T, R, Params = unknown> = Fn<T, R, Params>;

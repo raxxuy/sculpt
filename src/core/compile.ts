@@ -2,6 +2,15 @@ import type { Node, Plan } from "./types";
 
 const quote = (name?: string) => JSON.stringify(name);
 
+export const collect = (
+  head: Node | undefined,
+  next: (node: Node) => Node | undefined,
+) => {
+  const nodes: Node[] = [];
+  for (let node = head; node; node = next(node)) nodes.push(node);
+  return nodes.reverse();
+};
+
 export const openScope = (head?: Node) => {
   const transforms: Node[] = [];
   let node = head;
@@ -113,15 +122,9 @@ export const compile = (head?: Node): Plan => {
 
   if (!derive) return toPlan(open);
 
-  const derives: Node[] = [];
-
-  for (let node: Node | undefined = derive; node; node = node.previousDerive) {
-    derives.push(node);
-  }
-
-  const closed = derives
-    .reverse()
-    .flatMap((node) => [...(node.ordered ?? []), node]);
+  const closed = collect(derive, (node) => node.previousDerive).flatMap(
+    (node) => [...(node.ordered ?? []), node],
+  );
 
   return toPlan(closed.concat(open));
 };

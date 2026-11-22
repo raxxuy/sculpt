@@ -1,10 +1,8 @@
-import type { CheckedTransform, Context, Transform } from "../core/types";
-
-type Apply<T> = (value: T, context?: Context<unknown>) => T;
+import type { Call, CheckedTransform, Context, Transform } from "../core/types";
 
 const remap = <T>(
   data: T[],
-  transform: Apply<T>,
+  transform: Call<T, T>,
   from: number,
   first: T,
   context?: Context<unknown>,
@@ -19,7 +17,7 @@ const remap = <T>(
 export const each = <T, R extends T = T, Params = unknown>(
   transform: CheckedTransform<T, R, Params>,
 ): Transform<T[], Params> => {
-  const apply = transform as Apply<T>;
+  const apply = transform as Call<T, T>;
 
   return ((data: T[], context?: Context<unknown>) => {
     for (let i = 0; i < data.length; i++) {

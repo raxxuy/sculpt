@@ -1,4 +1,4 @@
-import type { Context, Derive, Fn } from "../core/types";
+import type { Call, Context, Derive, Fn } from "../core/types";
 
 type Simplify<T> = { [K in keyof T]: T[K] } & {};
 
@@ -19,18 +19,16 @@ export function extend<T extends object, R extends object, Params = unknown>(
 export function extend<T extends object, Params>(
   arg: Fn<T, object, Params> | Record<string, Fn<T, unknown, Params>>,
 ): Derive<T, object, Params> {
-  type Field = (data: T, context?: Context<Params>) => unknown;
-
   if (typeof arg === "function") {
-    const fn = arg as Field;
+    const fn = arg as Call<T, object, Params>;
 
     return ((data: T, context?: Context<Params>) => ({
       ...data,
-      ...(fn(data, context) as object),
+      ...fn(data, context),
     })) as Derive<T, object, Params>;
   }
 
-  const fields = Object.entries(arg) as [string, Field][];
+  const fields = Object.entries(arg) as [string, Call<T, unknown, Params>][];
 
   return ((data: T, context?: Context<Params>) => {
     const result = { ...data } as Record<string, unknown>;

@@ -1,4 +1,4 @@
-import { compile, openScope, orderScope } from "./compile";
+import { collect, compile, openScope, orderScope } from "./compile";
 import { StepError } from "./errors";
 import { trace } from "./execute";
 import type {
@@ -49,14 +49,6 @@ const append = (
     ordered: closed && orderScope(closed.transforms),
     previousDerive: closed?.derive,
   };
-};
-
-const toArray = (head?: Node) => {
-  const nodes: Node[] = [];
-
-  for (let node = head; node; node = node.previous) nodes.push(node);
-
-  return nodes.reverse();
 };
 
 const describe = (node: Node, executionIndex: number): InspectionStep => {
@@ -145,7 +137,9 @@ export class Pipeline<
       }
     >
   > {
-    const head = toArray(other.head).reduce<Node | undefined>(
+    const head = collect(other.head, (node) => node.previous).reduce<
+      Node | undefined
+    >(
       (previous, { kind, fn, name, after }) =>
         append(previous, kind, fn, name, after),
       this.head,

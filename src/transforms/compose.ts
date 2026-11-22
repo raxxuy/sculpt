@@ -1,4 +1,4 @@
-import type { CheckedTransform, Context, Transform } from "../core/types";
+import type { Call, CheckedTransform, Context, Transform } from "../core/types";
 
 export function compose<T, Params = unknown>(): Transform<T, Params>;
 export function compose<T, A extends T, Params = unknown>(
@@ -107,7 +107,7 @@ export function compose<
 export function compose<T, Params>(
   ...transforms: Transform<T, Params>[]
 ): Transform<T, Params> {
-  const steps = transforms as ((data: T, context?: Context<Params>) => T)[];
+  const steps = transforms as Call<T, T, Params>[];
 
   return ((data: T, context?: Context<Params>) =>
     steps.reduce((value, step) => step(value, context), data)) as Transform<

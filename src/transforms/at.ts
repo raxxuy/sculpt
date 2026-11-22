@@ -1,5 +1,5 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: paths are checked by Path<T>, values are untyped at runtime */
-import type { CheckedTransform, Context, Transform } from "../core/types";
+import type { Call, CheckedTransform, Context, Transform } from "../core/types";
 
 type Path<T> = T extends readonly unknown[]
   ? never
@@ -18,7 +18,7 @@ type PathValue<T, P extends string> = P extends `${infer K}.${infer R}`
 const update = (
   data: any,
   keys: string[],
-  fn: Transform<any>,
+  fn: Call<any, any, any>,
   depth: number,
   context?: Context<any>,
 ): any => {
@@ -54,7 +54,7 @@ export const at = <
   return ((data: T, context?: Context<Params>) =>
     targets.reduce(
       (value, keys) =>
-        update(value, keys, transform as Transform<any>, 0, context),
+        update(value, keys, transform as Call<any, any, any>, 0, context),
       data,
     )) as Transform<T, Params>;
 };
